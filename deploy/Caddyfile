@@ -1,0 +1,21 @@
+# Same-origin API, WebSocket and static app with automatic HTTPS.
+game.example.com {
+  encode zstd gzip
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy strict-origin-when-cross-origin
+    Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'"
+  }
+  handle /api/* {
+    reverse_proxy 127.0.0.1:3000
+  }
+  handle /live {
+    reverse_proxy 127.0.0.1:3000
+  }
+  handle {
+    root * /srv/ages/current/dist/web
+    try_files {path} /index.html
+    file_server
+    header Cache-Control "no-cache"
+  }
+}

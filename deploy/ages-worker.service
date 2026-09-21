@@ -1,0 +1,21 @@
+# Worker process; elapsed timestamps survive restart and suspension.
+[Unit]
+Description=Ages of Ash worker
+After=network-online.target postgresql.service
+[Service]
+User=ages
+Group=ages
+WorkingDirectory=/srv/ages/current
+EnvironmentFile=/etc/ages/ages.env
+ExecStart=/usr/bin/node --enable-source-maps dist/worker.js
+Restart=always
+RestartSec=3
+MemoryMax=384M
+CPUQuota=100%
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+TimeoutStopSec=60
+[Install]
+WantedBy=multi-user.target

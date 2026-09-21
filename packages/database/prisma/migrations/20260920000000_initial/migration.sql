@@ -1,0 +1,25 @@
+-- Responsibility: bootstrap durable game data; all amounts and counters must be nonnegative.
+CREATE TABLE "Player" ("id" UUID PRIMARY KEY, "email" TEXT UNIQUE, "password" TEXT, "name" TEXT NOT NULL, "state" JSONB NOT NULL, "guildId" UUID, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX "Player_guildId_idx" ON "Player"("guildId");
+CREATE TABLE "Session" ("token" TEXT PRIMARY KEY, "playerId" UUID NOT NULL REFERENCES "Player"("id") ON DELETE CASCADE, "expiresAt" TIMESTAMPTZ NOT NULL);
+CREATE INDEX "Session_expiresAt_idx" ON "Session"("expiresAt");
+CREATE INDEX "Session_playerId_idx" ON "Session"("playerId");
+CREATE TABLE "Receipt" ("nonce" UUID PRIMARY KEY, "playerId" UUID NOT NULL REFERENCES "Player"("id") ON DELETE CASCADE, "result" JSONB NOT NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX "Receipt_createdAt_idx" ON "Receipt"("createdAt");
+CREATE TABLE "Audit" ("id" BIGSERIAL PRIMARY KEY, "playerId" UUID NOT NULL REFERENCES "Player"("id") ON DELETE CASCADE, "action" TEXT NOT NULL, "detail" JSONB NOT NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX "Audit_playerId_createdAt_idx" ON "Audit"("playerId","createdAt");
+CREATE TABLE "RateLimit" ("key" TEXT PRIMARY KEY, "count" INT NOT NULL CHECK("count">=0), "expiresAt" TIMESTAMPTZ NOT NULL);
+CREATE INDEX "RateLimit_expiresAt_idx" ON "RateLimit"("expiresAt");
+CREATE TABLE "Leaderboard" ("playerId" UUID PRIMARY KEY REFERENCES "Player"("id") ON DELETE CASCADE, "name" TEXT NOT NULL, "score" INT NOT NULL, "level" INT NOT NULL, "influence" INT NOT NULL);
+CREATE INDEX "Leaderboard_score_idx" ON "Leaderboard"("score" DESC);
+CREATE TABLE "World" ("id" TEXT PRIMARY KEY, "hp" INT NOT NULL CHECK("hp">=0), "cycle" INT NOT NULL, "resetsAt" TIMESTAMPTZ NOT NULL);
+CREATE TABLE "Contribution" ("playerId" UUID NOT NULL REFERENCES "Player"("id") ON DELETE CASCADE, "cycle" INT NOT NULL, "damage" INT NOT NULL CHECK("damage">=0), "claimed" BOOLEAN NOT NULL DEFAULT false, PRIMARY KEY("playerId","cycle"));
+CREATE TABLE "Bounty" ("id" UUID PRIMARY KEY, "issuerId" UUID NOT NULL REFERENCES "Player"("id"), "targetId" UUID NOT NULL REFERENCES "Player"("id"), "amount" INT NOT NULL CHECK("amount">0), "claimedBy" UUID REFERENCES "Player"("id"), "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX "Bounty_targetId_claimedBy_idx" ON "Bounty"("targetId","claimedBy");
+CREATE TABLE "Guild" ("id" UUID PRIMARY KEY, "name" TEXT UNIQUE NOT NULL, "ownerId" UUID NOT NULL REFERENCES "Player"("id"));
+ALTER TABLE "Player" ADD CONSTRAINT "Player_guildId_fkey" FOREIGN KEY ("guildId") REFERENCES "Guild"("id");
+CREATE TABLE "War" ("id" UUID PRIMARY KEY, "attackerId" UUID NOT NULL REFERENCES "Guild"("id"), "defenderId" UUID NOT NULL REFERENCES "Guild"("id"), "expiresAt" TIMESTAMPTZ NOT NULL);
+CREATE UNIQUE INDEX "War_attackerId_defenderId_key" ON "War"("attackerId","defenderId");
+CREATE TABLE "Message" ("id" UUID PRIMARY KEY, "senderId" UUID NOT NULL REFERENCES "Player"("id"), "senderName" TEXT NOT NULL, "channel" TEXT NOT NULL, "body" TEXT NOT NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX "Message_channel_createdAt_idx" ON "Message"("channel","createdAt");
+CREATE TABLE "Relation" ("playerId" UUID NOT NULL REFERENCES "Player"("id") ON DELETE CASCADE, "otherId" UUID NOT NULL REFERENCES "Player"("id") ON DELETE CASCADE, "kind" TEXT NOT NULL CHECK("kind" IN ('friend','rival')), PRIMARY KEY("playerId","otherId"));

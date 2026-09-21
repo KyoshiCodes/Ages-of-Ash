@@ -1,0 +1,15 @@
+name: Agent task
+description: Bounded implementation brief
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal, owned files and invariants
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria and exact verification command
+    validations:
+      required: true

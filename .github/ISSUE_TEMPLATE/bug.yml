@@ -1,0 +1,13 @@
+name: Bug
+description: Reproducible behavior failure
+body:
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps, expected behavior and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Browser, Windows version, doctor output and redacted logs

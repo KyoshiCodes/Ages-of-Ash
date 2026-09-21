@@ -1,0 +1,3 @@
+#!/usr/bin/env node
+/** Conventional message gate. */
+import "../scripts/commit-message.mjs";

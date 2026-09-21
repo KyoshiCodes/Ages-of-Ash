@@ -1,0 +1,28 @@
+{
+  "name": "Ages of Ash",
+  "short_name": "Ages of Ash",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121716",
+  "theme_color": "#121716",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "purpose": "any maskable",
+      "sizes": "192x192",
+      "src": "/icons/app-192.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "any maskable",
+      "sizes": "512x512",
+      "src": "/icons/app-512.png",
+      "type": "image/png"
+    }
+  ]
+}

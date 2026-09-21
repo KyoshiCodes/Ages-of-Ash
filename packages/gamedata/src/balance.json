@@ -1,0 +1,141 @@
+{
+  "initialCash": 400,
+  "initialResources": {
+    "energy": 30,
+    "stamina": 12,
+    "health": 100,
+    "nerve": 10
+  },
+  "capPerLevel": {
+    "energy": 2,
+    "stamina": 1,
+    "health": 5,
+    "nerveEvery": 5
+  },
+  "capPerSkill": {
+    "energy": 3,
+    "stamina": 2,
+    "health": 10
+  },
+  "regenBase": 1,
+  "healthRegenBase": 3,
+  "maxRegen": 10,
+  "skillPointsPerLevel": 3,
+  "lootShardThreshold": 0.01,
+  "lootSalvageThreshold": 0.2,
+  "lootSalvage": 2,
+  "gearUpgradeMultiplier": 0.1,
+  "affinityMultiplier": 0.1,
+  "maxStack": 100,
+  "maxUpgrade": 10,
+  "basePower": 10,
+  "powerPerLevel": 2,
+  "powerPerSkill": 5,
+  "prestigeMultiplier": 0.03,
+  "prestigeLevel": 30,
+  "varianceMin": 0.9,
+  "varianceRange": 0.2,
+  "minDamage": 5,
+  "maxDamage": 35,
+  "baseDamage": 12,
+  "masteryTierBonus": 0.15,
+  "masteryCap": 20,
+  "maxHoldingTier": 10,
+  "holdingUpkeep": 0.1,
+  "craftSalvageBase": 5,
+  "upgradeSalvageBase": 3,
+  "upgradeShardEvery": 3,
+  "salvagePerCopy": 2,
+  "tonicCost": 60,
+  "tonicHealing": 40,
+  "solo": {
+    "minimumHealth": 10,
+    "stamina": 2,
+    "phaseThresholds": [230, 100],
+    "correctMultiplier": 1.3,
+    "wrongMultiplier": 0.6,
+    "correctDamage": 4,
+    "wrongDamage": 18,
+    "cash": 200,
+    "xp": 70,
+    "shards": 2,
+    "salvage": 5,
+    "cooldownMs": 3600000
+  },
+  "pvp": {
+    "bracketMinimum": 3,
+    "bracketFraction": 0.2,
+    "minimumHealth": 20,
+    "stamina": 2,
+    "retaliationMultiplier": 1.05,
+    "winDamage": 5,
+    "lossDamage": 20,
+    "maxStolen": 100,
+    "stolenFraction": 0.05,
+    "xp": 10,
+    "raidFraction": 0.2,
+    "bounty": 200,
+    "warInfluence": 5
+  },
+  "world": {
+    "stamina": 3,
+    "health": 8,
+    "minimumHealth": 10,
+    "damageMultiplier": 1.5,
+    "cash": 5000,
+    "xp": 500,
+    "shards": 10,
+    "minimumShards": 1,
+    "cycleMs": 86400000
+  },
+  "influence": {
+    "nerve": 3,
+    "cash": 25,
+    "points": 10
+  },
+  "login": {
+    "cashPerDay": 25,
+    "streakCap": 7,
+    "marks": 5
+  },
+  "mission": {
+    "daily": {
+      "cash": 150,
+      "xp": 30,
+      "shards": 1
+    },
+    "weekly": {
+      "cash": 1000,
+      "xp": 100,
+      "shards": 3
+    }
+  },
+  "cosmeticCost": 20,
+  "tickMs": 60000,
+  "sessionDays": 7,
+  "attackCooldownMs": 30000,
+  "protectionMs": 300000,
+  "retaliationMs": 600000,
+  "dailyAttackCap": 5,
+  "masteryRuns": 5,
+  "maxLevel": 100,
+  "seasonMs": 2592000000,
+  "maxCrew": 100,
+  "bossHealth": 350,
+  "worldBossHealth": 10000,
+  "holdingPeriodMs": 3600000,
+  "holdingStorageHours": 24,
+  "dailyMission": 5,
+  "weeklyMission": 25,
+  "curves": {
+    "xpBase": 60,
+    "xpExponent": 1.35,
+    "holdingCostBase": 150,
+    "holdingGrowth": 1.7,
+    "holdingIncomeBase": 30,
+    "crewBase": 40,
+    "crewGrowth": 1.08,
+    "regenBase": 200,
+    "regenExponent": 2
+  }
+}

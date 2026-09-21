@@ -1,0 +1,34 @@
+# Decisions
+
+- ADR-001: Pin Node 24.21.0, pnpm 12.5.1, Prisma 7.10.0, Vite 8.3.0 and Playwright 1.63.0, verified against published release metadata on 2026-09-20.
+- ADR-002: PostgreSQL 18 is the only datastore; pg-boss queues, sessions, rate buckets, action receipts, leaderboard summaries and notifications share it.
+- ADR-003: A versioned, Zod-validated JSON player aggregate holds tightly coupled game state; relational tables hold identity, sessions, audit, messages, guilds and global bosses.
+- ADR-004: Lock player rows in lexical ID order, then the shared world row; atomically commit rewards, receipts, audits and notifications.
+- ADR-005: PostgreSQL NOTIFY is an invalidation hint, never durable game state; reconnect and each mutation refetch authoritative snapshots.
+- ADR-006: CacheStore is an in-process bounded LRU; QueueDriver and PubSub isolate infrastructure. A future remote-cache driver is optional production work and is never required locally.
+- ADR-007: Target 100–500 simultaneous active players initially; benchmark at 50–100 actions/sec and before 1,000 concurrent players, since queue/row contention, write amplification and notification fan-out dominate before idle connections do.
+- ADR-008: Migrate scaling incrementally: measured indexes/pool budgets, split queue database on PostgreSQL, partition audit, dedicated notification listener, external PubSub/CacheStore adapters only when measurements justify them.
+- ADR-009: Checked-in migrations use migrate deploy on first run to avoid requiring CREATEDB; migrate dev is reserved for schema authors with a shadow database.
+- ADR-010: Same-origin opaque refresh-session cookies are the authentication credential; rotate on explicit refresh, hash tokens at rest, expire after seven days, and validate Origin on every mutation.
+- ADR-011: Skill and inventory numbers live in gamedata; all rewards and random rolls execute server-side with cryptographic randomness.
+- ADR-012: One public world and one season, four original eras unlocked by level; seasonal influence resets without deleting permanent progression.
+- ADR-013: No payment processor in v1; premium currency is earned for cosmetic recolors only, with no random paid rewards.
+- ADR-014: CI uses a PostgreSQL service supplied by the hosted runner; development uses the installed Windows service.
+- ADR-015: Deployment scripts are Node programs invoking Ubuntu system tools, with a PowerShell entry point from Windows; no shell-script runtime is required for project scripts.
+- ADR-016: V1 uses modest static content with full executable mechanics; expansive story chains and commercial live operations remain content/release work.
+- ADR-017: pnpm 12 reserves its built-in doctor command, so project diagnostics use `pnpm run doctor` and `pnpm run doctor --fix`; overriding the package manager would make setup less reliable.
+- ADR-018: When the installed Windows PostgreSQL service is absent, verification may use the official EDB native binary archive in ignored .local with an isolated cluster; the documented user setup still installs the native service.
+- ADR-019: B3 supersedes the original rendering restriction only for optional, lazy-loaded R3F inspections; the full game remains DOM/CSS/SVG with a 2D fallback.
+- ADR-020: Prisma remains exactly 7.10.0; React and React DOM are pinned to 19.2.8 to satisfy the installed R3F 9 peer range.
+- ADR-021: JSON content and balance are Zod-validated before build and seed; ContentDefinition mirrors the release catalog while the immutable validated package drives gameplay.
+- ADR-022: Offline credit uses an activity anchor separate from worker lastTickAt: eight hours full, the next sixteen at 25%, then zero; faction pressure continues to its cap.
+- ADR-023: Integer resource remainders and rational BigInt holding remainders make irregular worker ticks equal a single catch-up; UI countdowns never settle value.
+- ADR-024: Operations reserve energy at start, commit a server-only success roll, and require explicit resolution after three seconds; legacy job endpoints enter this same timed path.
+- ADR-025: The playable ledger retains the latest 100 records; forgery/redaction cannot change relational audit history or nonce receipts.
+- ADR-026: Ash Cycle requires 60 mastery and four elapsed hours per cycle, resets level/skills/mastery/equipment selection, and preserves assets, crew and history; ash boosts operation cash and holding income by 2% per point.
+- ADR-027: Four named crew contacts supplement combat crew count; loyalty gates orders, history unlocks unique operations, and a 200-crown rehire prevents permanent starter defection softlocks.
+- ADR-028: One connected four-node supply graph and one escalating faction establish spatial gameplay before a larger map; pressure reduces holding income 4% per level up to six.
+- ADR-029: First-party telemetry records server action categories and session timing only; a 30-minute gap starts a new session and hidden-tab polling does not refresh activity.
+- ADR-030: Original generated Opus loops are streamed only after an explicit enable gesture, default muted, and paused when hidden; no external audio license is required.
+- ADR-031: Initial JS is gated at 400 KiB gzip; 60 fps remains a physical integrated-GPU/mobile validation target, not a claim inferred from headless browser tests.
+- ADR-032: Content/aggregate seeding runs during a brief deployment maintenance window so an older worker cannot overwrite new aggregate fields; code rollback never rolls back schema.

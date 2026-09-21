@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  argon2: true
+  esbuild: true
+  "@prisma/engines": true
+  prisma: true
+minimumReleaseAgeExclude:
+  - pg-boss@12.33.3

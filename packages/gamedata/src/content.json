@@ -1,0 +1,280 @@
+{
+  "eras": [
+    {
+      "id": 0,
+      "name": "Veiled Streets",
+      "region": "Cinder Quay",
+      "faction": "The Brass Vow",
+      "accent": "#e8ad63",
+      "level": 1
+    },
+    {
+      "id": 1,
+      "name": "Tidebound Accord",
+      "region": "Sereglass Steps",
+      "faction": "The Stillwake Order",
+      "accent": "#69d5c6",
+      "level": 5
+    },
+    {
+      "id": 2,
+      "name": "Crownfall Reach",
+      "region": "Veyrwood March",
+      "faction": "The Thornward Compact",
+      "accent": "#b89aff",
+      "level": 12
+    },
+    {
+      "id": 3,
+      "name": "Far Ember Expanse",
+      "region": "Nacre Drift",
+      "faction": "The Heliox Assembly",
+      "accent": "#77b9ff",
+      "level": 20
+    }
+  ],
+  "items": [
+    {
+      "id": "knife",
+      "name": "Quayglass Edge",
+      "slot": "attack",
+      "era": 0,
+      "attack": 8,
+      "defense": 1,
+      "rarity": 1,
+      "price": 80
+    },
+    {
+      "id": "coat",
+      "name": "Brasswoven Coat",
+      "slot": "defense",
+      "era": 0,
+      "attack": 1,
+      "defense": 9,
+      "rarity": 1,
+      "price": 80
+    },
+    {
+      "id": "bike",
+      "name": "Sootrunner Cycle",
+      "slot": "support",
+      "era": 0,
+      "attack": 4,
+      "defense": 4,
+      "rarity": 1,
+      "price": 100
+    },
+    {
+      "id": "glaive",
+      "name": "Stillwake Glaive",
+      "slot": "attack",
+      "era": 1,
+      "attack": 19,
+      "defense": 4,
+      "rarity": 2,
+      "price": 450
+    },
+    {
+      "id": "mantle",
+      "name": "Sereglass Mantle",
+      "slot": "defense",
+      "era": 1,
+      "attack": 4,
+      "defense": 20,
+      "rarity": 2,
+      "price": 450
+    },
+    {
+      "id": "stag",
+      "name": "Miststep Courser",
+      "slot": "support",
+      "era": 1,
+      "attack": 10,
+      "defense": 10,
+      "rarity": 2,
+      "price": 500
+    },
+    {
+      "id": "relic",
+      "name": "Thornward Oathiron",
+      "slot": "attack",
+      "era": 2,
+      "attack": 35,
+      "defense": 8,
+      "rarity": 3,
+      "price": 1500
+    },
+    {
+      "id": "aegis",
+      "name": "Hollowcrown Aegis",
+      "slot": "defense",
+      "era": 2,
+      "attack": 8,
+      "defense": 36,
+      "rarity": 3,
+      "price": 1500
+    },
+    {
+      "id": "skiff",
+      "name": "Marshlight Skiff",
+      "slot": "support",
+      "era": 2,
+      "attack": 20,
+      "defense": 20,
+      "rarity": 3,
+      "price": 1700
+    },
+    {
+      "id": "blade",
+      "name": "Heliox Arcblade",
+      "slot": "attack",
+      "era": 3,
+      "attack": 55,
+      "defense": 12,
+      "rarity": 4,
+      "price": 4000
+    },
+    {
+      "id": "shell",
+      "name": "Nacre Wardplate",
+      "slot": "defense",
+      "era": 3,
+      "attack": 12,
+      "defense": 56,
+      "rarity": 4,
+      "price": 4000
+    },
+    {
+      "id": "ship",
+      "name": "Quiet Meridian",
+      "slot": "support",
+      "era": 3,
+      "attack": 32,
+      "defense": 32,
+      "rarity": 4,
+      "price": 4500
+    }
+  ],
+  "jobs": [
+    {
+      "id": "quay",
+      "name": "Secure the Cinder Route",
+      "era": 0,
+      "energy": 4,
+      "xp": 18,
+      "cash": 45,
+      "requires": null,
+      "previous": null
+    },
+    {
+      "id": "ledger",
+      "name": "Recover the Brass Ledger",
+      "era": 0,
+      "energy": 7,
+      "xp": 32,
+      "cash": 85,
+      "requires": "knife",
+      "previous": "quay"
+    },
+    {
+      "id": "pilgrim",
+      "name": "Escort the Stillwake Pilgrims",
+      "era": 1,
+      "energy": 8,
+      "xp": 45,
+      "cash": 150,
+      "requires": null,
+      "previous": null
+    },
+    {
+      "id": "mirror",
+      "name": "Seal the Mirror Breach",
+      "era": 1,
+      "energy": 10,
+      "xp": 60,
+      "cash": 220,
+      "requires": "glaive",
+      "previous": "pilgrim"
+    },
+    {
+      "id": "wood",
+      "name": "Break the Veyrwood Siege",
+      "era": 2,
+      "energy": 12,
+      "xp": 90,
+      "cash": 400,
+      "requires": null,
+      "previous": null
+    },
+    {
+      "id": "crown",
+      "name": "Unmake the Hollow Crown",
+      "era": 2,
+      "energy": 15,
+      "xp": 120,
+      "cash": 600,
+      "requires": "relic",
+      "previous": "wood"
+    },
+    {
+      "id": "lane",
+      "name": "Reopen the Nacre Lane",
+      "era": 3,
+      "energy": 16,
+      "xp": 160,
+      "cash": 900,
+      "requires": null,
+      "previous": null
+    },
+    {
+      "id": "beacon",
+      "name": "Capture the Meridian Beacon",
+      "era": 3,
+      "energy": 20,
+      "xp": 220,
+      "cash": 1300,
+      "requires": "blade",
+      "previous": "lane"
+    },
+    {
+      "id": "tally",
+      "name": "Recover the Salt Tally",
+      "era": 0,
+      "energy": 8,
+      "xp": 44,
+      "cash": 110,
+      "requires": "knife",
+      "previous": "ledger"
+    },
+    {
+      "id": "briar",
+      "name": "Seal the Briar Testament",
+      "era": 1,
+      "energy": 11,
+      "xp": 72,
+      "cash": 245,
+      "requires": "glaive",
+      "previous": "mirror"
+    },
+    {
+      "id": "wake",
+      "name": "Trace the Hollow Wake",
+      "era": 2,
+      "energy": 16,
+      "xp": 132,
+      "cash": 625,
+      "requires": "relic",
+      "previous": "crown"
+    },
+    {
+      "id": "escrow",
+      "name": "Break the Quiet Escrow",
+      "era": 3,
+      "energy": 21,
+      "xp": 232,
+      "cash": 1325,
+      "requires": "blade",
+      "previous": "beacon"
+    }
+  ]
+}

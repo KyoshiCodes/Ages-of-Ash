@@ -1,0 +1,21 @@
+# API process; Caddy is the only public listener.
+[Unit]
+Description=Ages of Ash API
+After=network-online.target postgresql.service
+[Service]
+User=ages
+Group=ages
+WorkingDirectory=/srv/ages/current
+EnvironmentFile=/etc/ages/ages.env
+ExecStart=/usr/bin/node --enable-source-maps dist/api.js
+Restart=always
+RestartSec=3
+MemoryMax=512M
+CPUQuota=150%
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+TimeoutStopSec=30
+[Install]
+WantedBy=multi-user.target

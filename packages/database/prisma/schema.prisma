@@ -1,0 +1,187 @@
+// Durable identity and world state. Game writes require locks and an action receipt.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Player {
+  id               String         @id @default(uuid()) @db.Uuid
+  email            String?        @unique
+  password         String?
+  name             String
+  state            Json
+  guildId          String?        @db.Uuid
+  createdAt        DateTime       @default(now()) @db.Timestamptz(6)
+  sessions         Session[]
+  receipts         Receipt[]
+  audits           Audit[]
+  guild            Guild?         @relation("Members", fields: [guildId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  founded          Guild[]        @relation("Founder")
+  leaderboard      Leaderboard?
+  contributions    Contribution[]
+  issuedBounties   Bounty[]       @relation("Issuer")
+  targetedBounties Bounty[]       @relation("Target")
+  claimedBounties  Bounty[]       @relation("Claimant")
+  messages         Message[]
+  relations        Relation[]     @relation("From")
+  relatedBy        Relation[]     @relation("To")
+  playSessions PlaySession[]
+  telemetry TelemetryEvent[]
+
+  @@index([guildId])
+}
+
+model Session {
+  token     String   @id
+  playerId  String   @db.Uuid
+  expiresAt DateTime @db.Timestamptz(6)
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expiresAt])
+  @@index([playerId])
+}
+
+model Receipt {
+  nonce     String   @id @db.Uuid
+  playerId  String   @db.Uuid
+  result    Json
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([createdAt])
+}
+
+model Audit {
+  id        BigInt   @id @default(autoincrement())
+  playerId  String   @db.Uuid
+  action    String
+  detail    Json
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([playerId, createdAt])
+}
+
+model RateLimit {
+  key       String   @id
+  count     Int
+  expiresAt DateTime @db.Timestamptz(6)
+
+  @@index([expiresAt])
+}
+
+model Leaderboard {
+  playerId  String @id @db.Uuid
+  name      String
+  score     Int
+  level     Int
+  influence Int
+  player    Player @relation(fields: [playerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([score(sort: Desc)])
+}
+
+model World {
+  id       String   @id
+  hp       Int
+  cycle    Int
+  resetsAt DateTime @db.Timestamptz(6)
+}
+
+model Contribution {
+  playerId String  @db.Uuid
+  cycle    Int
+  damage   Int
+  claimed  Boolean @default(false)
+  player   Player  @relation(fields: [playerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([playerId, cycle])
+}
+
+model Bounty {
+  id        String   @id @default(uuid()) @db.Uuid
+  issuerId  String   @db.Uuid
+  targetId  String   @db.Uuid
+  amount    Int
+  claimedBy String?  @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  issuer    Player   @relation("Issuer", fields: [issuerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  target    Player   @relation("Target", fields: [targetId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  claimant  Player?  @relation("Claimant", fields: [claimedBy], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([targetId, claimedBy])
+}
+
+model Guild {
+  id       String   @id @default(uuid()) @db.Uuid
+  name     String   @unique
+  ownerId  String   @db.Uuid
+  owner    Player   @relation("Founder", fields: [ownerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  members  Player[] @relation("Members")
+  attacks  War[]    @relation("Attacker")
+  defenses War[]    @relation("Defender")
+}
+
+model War {
+  id         String   @id @default(uuid()) @db.Uuid
+  attackerId String   @db.Uuid
+  defenderId String   @db.Uuid
+  expiresAt  DateTime @db.Timestamptz(6)
+  attacker   Guild    @relation("Attacker", fields: [attackerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  defender   Guild    @relation("Defender", fields: [defenderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([attackerId, defenderId])
+}
+
+model Message {
+  id         String   @id @default(uuid()) @db.Uuid
+  senderId   String   @db.Uuid
+  senderName String
+  channel    String
+  body       String
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  sender     Player   @relation(fields: [senderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([channel, createdAt])
+}
+
+model Relation {
+  playerId String @db.Uuid
+  otherId  String @db.Uuid
+  kind     String
+  player   Player @relation("From", fields: [playerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  other    Player @relation("To", fields: [otherId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([playerId, otherId])
+}
+
+model ContentDefinition {
+  key String @id
+  kind String
+  definition Json
+}
+model PlaySession {
+  id String @id @default(uuid()) @db.Uuid
+  playerId String @db.Uuid
+  startedAt DateTime @db.Timestamptz(6)
+  lastAt DateTime @db.Timestamptz(6)
+  operations Int @default(0)
+  lastStep String @default("arrival")
+  player Player @relation(fields:[playerId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  events TelemetryEvent[]
+  @@index([playerId,startedAt])
+}
+model TelemetryEvent {
+  id BigInt @id @default(autoincrement())
+  playerId String @db.Uuid
+  sessionId String @db.Uuid
+  type String
+  at DateTime @default(now()) @db.Timestamptz(6)
+  value Int @default(0)
+  player Player @relation(fields:[playerId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  session PlaySession @relation(fields:[sessionId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  @@index([type,at])
+}

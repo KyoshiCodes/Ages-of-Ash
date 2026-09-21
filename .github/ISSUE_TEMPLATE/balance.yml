@@ -1,0 +1,13 @@
+name: Balance
+description: Propose a measurable tuning change
+body:
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Current formula, player cohort and observed outcome
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed gamedata change and simulation acceptance bounds

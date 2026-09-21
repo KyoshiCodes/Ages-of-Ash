@@ -1,0 +1,225 @@
+{
+  "offline": {
+    "fullHours": 8,
+    "maximumHours": 24,
+    "reducedRate": 0.25,
+    "reportAfterMs": 120000
+  },
+  "operation": {
+    "durationMs": 3000,
+    "cautiousChance": 1,
+    "boldChance": 0.75,
+    "boldMultiplier": 1.8,
+    "failureCashFraction": 0.25
+  },
+  "prestige": {
+    "masteryRequired": 60,
+    "minimumHours": 4,
+    "multiplierPerAsh": 0.02
+  },
+  "ledger": {
+    "auditNerve": 2,
+    "auditEntries": 3,
+    "forgeNerve": 3,
+    "forgeCash": 90,
+    "forgeHeat": 25,
+    "redactCost": 40,
+    "redactHeat": 10,
+    "investigationThreshold": 100,
+    "fine": 120
+  },
+  "threat": {
+    "intervalMs": 3600000,
+    "maximum": 6,
+    "incomePenalty": 0.04,
+    "suppressStamina": 3
+  },
+  "crew": [
+    {
+      "id": "mara",
+      "name": "Mara Vell",
+      "era": 0,
+      "trait": "principled",
+      "loyalty": 70,
+      "memoryGate": 3,
+      "operation": "witness"
+    },
+    {
+      "id": "iven",
+      "name": "Iven Rusk",
+      "era": 1,
+      "trait": "daring",
+      "loyalty": 65,
+      "memoryGate": 3,
+      "operation": "reflection"
+    },
+    {
+      "id": "sela",
+      "name": "Sela Fen",
+      "era": 2,
+      "trait": "methodical",
+      "loyalty": 75,
+      "memoryGate": 4,
+      "operation": "oath"
+    },
+    {
+      "id": "nox",
+      "name": "Nox Aster",
+      "era": 3,
+      "trait": "daring",
+      "loyalty": 60,
+      "memoryGate": 4,
+      "operation": "signal"
+    }
+  ],
+  "holdings": [
+    {
+      "id": "quay",
+      "name": "Quay Counting House",
+      "era": 0,
+      "x": 0,
+      "y": 0,
+      "neighbors": ["steps"]
+    },
+    {
+      "id": "steps",
+      "name": "Sereglass Relay",
+      "era": 1,
+      "x": 1,
+      "y": 0,
+      "neighbors": ["quay", "march"]
+    },
+    {
+      "id": "march",
+      "name": "Veyrwood Storehouse",
+      "era": 2,
+      "x": 1,
+      "y": 1,
+      "neighbors": ["steps", "drift"]
+    },
+    {
+      "id": "drift",
+      "name": "Nacre Supply Dock",
+      "era": 3,
+      "x": 2,
+      "y": 1,
+      "neighbors": ["march"]
+    }
+  ],
+  "lore": [
+    {
+      "id": "first-ink",
+      "title": "Receipt 001",
+      "form": "ledger fragment",
+      "trigger": "operations",
+      "threshold": 1,
+      "text": "One route secured. Three lamps extinguished. The payment arrived warm, though the courier had crossed the river in rain."
+    },
+    {
+      "id": "witness",
+      "title": "A name left intact",
+      "form": "intercepted letter",
+      "trigger": "audits",
+      "threshold": 1,
+      "text": "You could have erased her. Instead you checked the figures. I have told the others that your books still contain people."
+    },
+    {
+      "id": "ash-one",
+      "title": "The prior hand",
+      "form": "audit memorandum",
+      "trigger": "cycles",
+      "threshold": 1,
+      "text": "The new ledger bears the same indentation as the old. Someone pressed hard enough for the writing to survive the fire."
+    },
+    {
+      "id": "network",
+      "title": "Four warehouses, one key",
+      "form": "ledger fragment",
+      "trigger": "holdings",
+      "threshold": 2,
+      "text": "The key opens no door. Pass it to the next keeper anyway. A supply line is a promise made repeatedly."
+    },
+    {
+      "id": "crew-memory",
+      "title": "What Mara retained",
+      "form": "intercepted letter",
+      "trigger": "operations",
+      "threshold": 5,
+      "text": "She remembers the pause before your order. Not the crowns. Not the weather. The pause. Govern yourself accordingly."
+    }
+  ],
+  "achievements": [
+    {
+      "id": "ink",
+      "name": "First Ink",
+      "metric": "operations",
+      "threshold": 1,
+      "material": "ash",
+      "marks": 5
+    },
+    {
+      "id": "hand",
+      "name": "Steady Hand",
+      "metric": "operations",
+      "threshold": 10,
+      "material": "iron",
+      "marks": 10
+    },
+    {
+      "id": "auditor",
+      "name": "Brass Auditor",
+      "metric": "audits",
+      "threshold": 5,
+      "material": "brass",
+      "marks": 15
+    },
+    {
+      "id": "reborn",
+      "name": "Unburnt Signature",
+      "metric": "cycles",
+      "threshold": 1,
+      "material": "ember-glass",
+      "marks": 20
+    }
+  ],
+  "uniqueOperations": [
+    {
+      "id": "witness",
+      "name": "Protect the Last Witness",
+      "crew": "mara",
+      "cash": 140,
+      "xp": 50
+    },
+    {
+      "id": "reflection",
+      "name": "Cross the Quiet Reflection",
+      "crew": "iven",
+      "cash": 220,
+      "xp": 70
+    },
+    {
+      "id": "oath",
+      "name": "Recover the Keeper's Oath",
+      "crew": "sela",
+      "cash": 400,
+      "xp": 100
+    },
+    {
+      "id": "signal",
+      "name": "Answer the Unsent Signal",
+      "crew": "nox",
+      "cash": 650,
+      "xp": 140
+    }
+  ],
+  "weekly": { "operations": 10, "crewRequired": 2, "cash": 500, "xp": 80 },
+  "network": { "adjacencyBonus": 0.1, "linkCost": 75 },
+  "crewRules": {
+    "refusalBelow": 25,
+    "defectBelow": 10,
+    "boldLoss": 8,
+    "cautiousGain": 2,
+    "reassureCost": 50,
+    "reassureGain": 15
+  }
+}

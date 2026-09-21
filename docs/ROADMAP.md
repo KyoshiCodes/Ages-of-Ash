@@ -1,0 +1,11 @@
+# Roadmap
+
+Expansion delivered: twelve standard operations plus four crew operations; server-timed risk/resolution; exact capped offline recap; playable ledger and immutable audits; loyalty/memories/refusal/defection/rehire; linked supply graph and faction pressure; lore/material badges; validated seeded JSON; layered desk/motion; optional lazy 3D map/relic inspections with ember atmosphere; original streamed Opus; retention CLI and initial-JS performance gate. RETENTION and PERFORMANCE describe current limits. The original eight-operation scope below is historical.
+
+V1 executable scope: guest/registered accounts, guest upgrade, clocks, eight chained era operations, mastery and item gates, skills/levels/ascension, twelve items, equipment budgets, era crew affinity, crafting/upgrades/salvage/tonics, four holdings, duels/raids/protection/retaliation/bounties, phased solo boss, cooperative boss and contribution claims, influence and region controllers, timed wars/seasons/event, daily/weekly/login rewards, earned cosmetic marks, orders/chat/mail/relations, rankings and live invalidations. Native Windows setup and hosted deployment artifacts are included.
+
+Release gate: execute native PG18 integration and Chromium core-loop tests; audit schema drift; inspect mobile/desktop screenshots; perform two-player real-time tests; provision OCI and rehearse restore; load-test the target population. Do not call this publicly production-ready until these pass.
+
+Deferred product depth: large narrative content catalog, invitations/roles and order administration, moderation/report/ban tooling, email verification and password recovery, accessibility audit, balance simulations, commercial cosmetic pass and checkout, seasonal rewards/archives, player search/pagination beyond bounded initial lists, localization and extensive boss/content variations. These are explicit v1 omissions, not hidden core-path placeholders.
+
+Deferred infrastructure: metrics/alerts and worker heartbeat endpoint, PostgreSQL backups to external object storage, audit partitions, multiple API replicas, distributed fan-out at measured scale, and blue/green deployment. Every addition must preserve local native Windows development and server-authoritative rewards.
