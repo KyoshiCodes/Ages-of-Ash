@@ -39,3 +39,4 @@
 - ADR-037: Readiness requires canonical data and a fresh worker heartbeat; liveness remains cheap, and internal metrics are loopback-only with a token.
 - ADR-038: Native backup/restore drills use an empty `ages_restore_*` target; a populated target is rejected and production restore needs a separate incident decision.
 - ADR-039: `pnpm setup:db` creates/probes the configured role and database only; `db:generate`, `db:deploy`, and `db:seed` are separately explicit developer actions.
+- ADR-040: CI installs the exact PostgreSQL 18.6 PGDG noble client package and requires the native dump/restore drill on every disposable full run; raw dumps stay outside uploaded artifacts.

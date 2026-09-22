@@ -5,6 +5,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { commandSpec } from "../scripts/process.ts";
 import {
+  findPostgresClientBin,
+  parsePostgresClientVersion,
+} from "../scripts/postgres-client.ts";
+import {
+  assertRestoreParity,
+  assertPopulatedRestoreRejected,
+} from "../scripts/restore-parity.ts";
+import {
   runtimeConfig,
   errorKind,
 } from "../packages/infrastructure/src/operations.ts";
@@ -42,6 +50,55 @@ describe("release foundation", () => {
       command: "C:/PostgreSQL/bin/pg_dump.exe",
       args: ["--version"],
     });
+  });
+  it("discovers only complete Linux PostgreSQL client directories", () => {
+    const directory = mkdtempSync(join(tmpdir(), "ages-pg18-tools-"));
+    try {
+      for (const tool of ["pg_dump", "pg_restore", "psql"])
+        writeFileSync(join(directory, tool), "");
+      expect(findPostgresClientBin({ PG_BIN: directory }, "linux")).toBe(
+        directory,
+      );
+      rmSync(join(directory, "pg_restore"));
+      expect(findPostgresClientBin({ PG_BIN: directory }, "linux")).not.toBe(
+        directory,
+      );
+      expect(parsePostgresClientVersion("pg_dump (PostgreSQL) 18.6")).toEqual({
+        major: 18,
+        minor: 6,
+      });
+      expect(parsePostgresClientVersion("not a PostgreSQL binary")).toBeNull();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+  it("requires the populated-target refusal guard and complete restore parity", () => {
+    expect(() =>
+      assertPopulatedRestoreRejected({
+        status: 1,
+        stderr: "Restore target is not empty",
+      }),
+    ).not.toThrow();
+    for (const result of [
+      { status: 0, stderr: "" },
+      { status: 1, stderr: "pg_restore executable missing" },
+    ])
+      expect(() => assertPopulatedRestoreRejected(result)).toThrow();
+    const source = {
+      schema: [{ tablename: "Player" }],
+      migrations: [{ migration_name: "initial" }],
+      content: [{ key: "canonical" }],
+      players: [{ id: "seeded" }],
+      playSessions: [{ id: "session" }],
+      telemetry: [{ id: "event" }],
+      operational: [{ name: "heartbeat" }],
+    };
+    expect(() =>
+      assertRestoreParity(source, structuredClone(source)),
+    ).not.toThrow();
+    expect(() =>
+      assertRestoreParity(source, { ...source, telemetry: [] }),
+    ).toThrow();
   });
   it("defaults analytics off", () => {
     expect(

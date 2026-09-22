@@ -67,3 +67,7 @@ What/why: established a read-only migration/catalog/client doctor, repeat-safe s
 ## 2026-09-22 — Explicit local database initialization correction
 
 What/why: narrowed `setup:db` to role/database connectivity so a setup probe cannot silently migrate or seed the persistent development database; full acceptance now asserts an empty database stays empty after that command. Files: scripts/setup-db.ts, scripts/verify-full.ts, README.md, docs/SETUP.md and DECISIONS.md. Test: disposable bootstrap probe plus full migration/seed/E2E sequence. Confidence: high; the final full rerun passed. Open question: none for local initialization.
+
+## 2026-09-22 — CI backup/restore parity
+
+What/why: make the previously Windows-only custom-format dump, empty-target restore and populated-target refusal mandatory in Linux CI with pinned PostgreSQL 18.6 clients; compare migration/schema, canonical content, player, session, telemetry and operational rows without logging them. Files: scripts/{verify-full,postgres-client,restore-parity}.ts, tests/release.test.ts, .github/{pgdg.sources,workflows/ci.yml}, deploy/README.md, docs/{STATE,RECOVERY,HANDOFF,DECISIONS,PROGRESS}. Tests: 29 unit, 6 integration, 5 E2E and full native-Windows acceptance passed; hosted Linux parity pending. Confidence: high for local Windows, pending for hosted Linux; OCI staging/off-host restore unverified.

@@ -1,6 +1,6 @@
 /** Disposable-database acceptance runner. Never reads DATABASE_URL or migrates an existing application database. */
 import { Client } from "pg";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { createServer } from "node:net";
 import { spawn, spawnSync } from "node:child_process";
 import {
@@ -10,10 +10,21 @@ import {
   existsSync,
   rmSync,
   readFileSync,
+  readdirSync,
+  statSync,
 } from "node:fs";
 import { resolve, join, sep } from "node:path";
 import { commandSpec, execute } from "./process.ts";
 import { databaseStatus, clientStatus } from "./database-status.ts";
+import {
+  findPostgresClientBin,
+  verifyPostgresClients,
+} from "./postgres-client.ts";
+import {
+  restoreSnapshot,
+  assertRestoreParity,
+  assertPopulatedRestoreRejected,
+} from "./restore-parity.ts";
 const suffix = randomBytes(8).toString("hex"),
   database = `ages_verify_${suffix}`,
   role = `ages_verify_${suffix}`,
@@ -23,6 +34,7 @@ mkdirSync(logs, { recursive: true });
 const root = resolve(".local");
 mkdirSync(root, { recursive: true });
 let nativeDir: string | undefined,
+  backupDir: string | undefined,
   bin: string | undefined,
   started = false,
   created = false,
@@ -72,12 +84,8 @@ try {
       throw new Error(
         "Set VERIFY_ADMIN_URL explicitly to a disposable-server bootstrap account",
       );
-    bin = [
-      process.env.PG_BIN,
-      "C:/Program Files/PostgreSQL/18/bin",
-      ".local/postgresql/pgsql/bin",
-    ].find((p) => p && existsSync(join(p, "initdb.exe")));
-    if (!bin)
+    bin = findPostgresClientBin();
+    if (!bin || !existsSync(join(bin, "initdb.exe")))
       throw new Error(
         "Set PG_BIN to native PostgreSQL 18 binaries, or explicitly set VERIFY_ADMIN_URL",
       );
@@ -114,11 +122,38 @@ try {
   const url = new URL(adminUrl);
   if (!["postgresql:", "postgres:"].includes(url.protocol))
     throw new Error("Invalid bootstrap URL");
+  if (
+    process.env.CI === "true" &&
+    (url.hostname !== "127.0.0.1" ||
+      url.port !== "5432" ||
+      url.pathname !== "/postgres" ||
+      url.username !== "verification_admin" ||
+      url.search !== "")
+  )
+    throw new Error(
+      "CI verification requires its loopback service bootstrap URL",
+    );
   admin = new Client({
     connectionString: adminUrl,
     connectionTimeoutMillis: 5000,
   });
   await admin.connect();
+  const clientBin = findPostgresClientBin();
+  if (!clientBin) throw new Error("PostgreSQL 18 client tools are missing");
+  const serverVersion = Number(
+    (await admin.query("SHOW server_version_num")).rows[0].server_version_num,
+  );
+  const clientVersions = verifyPostgresClients(
+    clientBin,
+    Math.floor(serverVersion / 10000),
+  );
+  console.log(
+    `PostgreSQL server ${Math.floor(serverVersion / 10000)}.${serverVersion % 10000}; clients: ${Object.entries(
+      clientVersions,
+    )
+      .map(([name, version]) => `${name} ${version}`)
+      .join(", ")}`,
+  );
   const password = randomBytes(24).toString("hex");
   await admin.query(
     `CREATE ROLE "${role}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE`,
@@ -195,70 +230,120 @@ try {
     )
       throw new Error("Repeated seed altered existing player progress");
 
-    const backupPrivileges = await probe.query(
-      "SELECT has_table_privilege($1, $2, $3) AS can_write",
-      [backupRole, 'public."Player"', "INSERT"],
+    for (const privilege of ["INSERT", "UPDATE", "DELETE", "TRUNCATE"]) {
+      const grant = await probe.query(
+        "SELECT has_table_privilege($1, $2, $3) AS allowed",
+        [backupRole, 'public."Player"', privilege],
+      );
+      if (grant.rows[0].allowed)
+        throw new Error("Read-only backup role has player write access");
+    }
+    const runtimePrivilege = await admin.query(
+      "SELECT rolsuper,rolcreatedb,rolcreaterole,pg_has_role($1, 'pg_read_all_data', 'member') AS backup_member,pg_has_role($1, $2, 'member') AS backup_role_member FROM pg_roles WHERE rolname=$1",
+      [role, backupRole],
     );
-    if (backupPrivileges.rows[0].can_write)
+    if (
+      runtimePrivilege.rows[0].rolsuper ||
+      runtimePrivilege.rows[0].rolcreatedb ||
+      runtimePrivilege.rows[0].rolcreaterole ||
+      runtimePrivilege.rows[0].backup_member ||
+      runtimePrivilege.rows[0].backup_role_member
+    )
       throw new Error(
-        "Read-only backup role unexpectedly has player write access",
+        "Runtime verification role gained operator or backup privileges",
       );
 
-    if (bin && nativeDir) {
-      const dumpDir = join(nativeDir, "backups");
-      const backupEnv = {
-        ...env,
-        DATABASE_URL: backupUrl.toString(),
-        PG_BIN: bin,
-        BACKUP_DIR: dumpDir,
-      };
-      await step(
-        "05a-backup",
-        ["exec", "node", "deploy/backup.mjs"],
-        backupEnv,
+    const playerId = saved.rows[0]?.id as string | undefined;
+    if (!playerId)
+      throw new Error("Canonical seed lacks a restore-test player");
+    const sessionId = randomUUID();
+    await probe.query(
+      'INSERT INTO "PlaySession" (id,"playerId","startedAt","lastAt",operations,"lastStep") VALUES ($1,$2,now(),now(),1,$3)',
+      [sessionId, playerId, "restore-check"],
+    );
+    await probe.query(
+      'INSERT INTO "TelemetryEvent" ("playerId","sessionId",type,value) VALUES ($1,$2,$3,$4)',
+      [playerId, sessionId, "restore-check", 1],
+    );
+    await probe.query(
+      'INSERT INTO "OperationalStatus" (name,running,"durationMs","lagMs",failures) VALUES ($1,false,12,3,0)',
+      ["release_restore_" + suffix],
+    );
+    const sourceSnapshot = await restoreSnapshot(probe);
+    if (
+      !sourceSnapshot.content.length ||
+      !sourceSnapshot.players.length ||
+      !sourceSnapshot.playSessions.length ||
+      !sourceSnapshot.telemetry.length ||
+      !sourceSnapshot.operational.length
+    )
+      throw new Error("Restore source fixtures are incomplete");
+
+    backupDir = nativeDir
+      ? join(nativeDir, "backups")
+      : mkdtempSync(join(root, "release-backups-"));
+    const backupEnv = {
+      ...env,
+      DATABASE_URL: backupUrl.toString(),
+      PG_BIN: clientBin,
+      BACKUP_DIR: backupDir,
+    };
+    await step("05a-backup", ["exec", "node", "deploy/backup.mjs"], backupEnv);
+    const dumpName = readdirSync(backupDir).find((name) =>
+      name.endsWith(".dump"),
+    );
+    if (!dumpName)
+      throw new Error("Backup did not create a custom-format dump");
+    const dump = join(backupDir, dumpName);
+    if (
+      statSync(dump).size <= 5 ||
+      readFileSync(dump).subarray(0, 5).toString("ascii") !== "PGDMP"
+    )
+      throw new Error(
+        "Backup artifact is empty or not a PostgreSQL custom dump",
       );
-      const { readdirSync } = await import("node:fs");
-      const dump = join(
-        dumpDir,
-        readdirSync(dumpDir).find((name) => name.endsWith(".dump"))!,
+    const restoreName = "ages_restore_" + suffix;
+    await admin.query(`CREATE DATABASE "${restoreName}" OWNER "${role}"`);
+    restored = true;
+    const restoredUrl = new URL(env.DATABASE_URL!);
+    restoredUrl.pathname = "/" + restoreName;
+    await step(
+      "05b-restore",
+      ["exec", "node", "deploy/restore.mjs", dump, "--confirm-empty-target"],
+      { ...backupEnv, DATABASE_URL: restoredUrl.toString() },
+    );
+    console.log("=== 05c-restore-refusal ===");
+    const refused = spawnSync(
+      process.execPath,
+      ["deploy/restore.mjs", dump, "--confirm-empty-target"],
+      {
+        env: { ...backupEnv, DATABASE_URL: restoredUrl.toString() },
+        shell: false,
+        stdio: "pipe",
+      },
+    );
+    assertPopulatedRestoreRejected(refused);
+    writeFileSync(
+      join(logs, "05c-restore-refusal.log"),
+      "Populated restore target refused by empty-target guard.\n",
+    );
+    const restoredClient = new Client({
+      connectionString: restoredUrl.toString(),
+    });
+    await restoredClient.connect();
+    try {
+      if ((await databaseStatus(restoredClient)).length)
+        throw new Error("Restored database failed migration/content readiness");
+      assertRestoreParity(
+        sourceSnapshot,
+        await restoreSnapshot(restoredClient),
       );
-      const restoreName = "ages_restore_" + suffix;
-      await admin.query(`CREATE DATABASE "${restoreName}" OWNER "${role}"`);
-      restored = true;
-      const restoredUrl = new URL(env.DATABASE_URL!);
-      restoredUrl.pathname = "/" + restoreName;
-      await step(
-        "05b-restore",
-        ["exec", "node", "deploy/restore.mjs", dump, "--confirm-empty-target"],
-        { ...backupEnv, DATABASE_URL: restoredUrl.toString() },
-      );
-      const refused = spawnSync(
-        process.execPath,
-        ["deploy/restore.mjs", dump, "--confirm-empty-target"],
-        {
-          env: { ...backupEnv, DATABASE_URL: restoredUrl.toString() },
-          shell: false,
-          stdio: "pipe",
-        },
-      );
-      if (refused.status === 0)
-        throw new Error("Restore accepted a populated database");
-      const restoredClient = new Client({
-        connectionString: restoredUrl.toString(),
-      });
-      await restoredClient.connect();
-      try {
-        if ((await databaseStatus(restoredClient)).length)
-          throw new Error("Restore parity failed");
-        const restoredPlayers = await restoredClient.query(
-          'SELECT id,state FROM "Player" ORDER BY id',
-        );
-        if (JSON.stringify(saved.rows) !== JSON.stringify(restoredPlayers.rows))
-          throw new Error("Restore changed player state");
-      } finally {
-        await restoredClient.end();
-      }
+    } finally {
+      await restoredClient.end();
     }
+    console.log(
+      "Backup/restore parity passed for schema, migrations, content, players, sessions, telemetry and operational status.",
+    );
     const issues = await databaseStatus(probe);
     if (issues.length) throw new Error(issues.join("; "));
   } finally {
@@ -274,12 +359,15 @@ try {
       {
         ok: true,
         database: "unique disposable database",
+        postgresClients: clientVersions,
+        backupRestore: "passed",
         sequence: [
           "empty",
           "generate",
           "deploy",
           "seed",
           "repeat deploy/seed",
+          "backup/restore/refusal",
           "fast",
           "integration",
           "e2e",
@@ -321,6 +409,16 @@ try {
       "fast",
       "-w",
     ]);
+  if (backupDir && !nativeDir) {
+    const target = resolve(backupDir);
+    if (
+      !target.startsWith(root + sep) ||
+      !target.split(sep).at(-1)?.startsWith("release-backups-")
+    ) {
+      process.exitCode = 1;
+      console.error("Unsafe dump cleanup path; manual inspection required");
+    } else rmSync(target, { recursive: true, force: true });
+  }
   if (nativeDir) {
     const log = join(nativeDir, "postgres.log");
     if (existsSync(log))
