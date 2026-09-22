@@ -387,49 +387,88 @@ try {
     "Full verification failed. See artifacts/release; no persistent application database was targeted.",
   );
 } finally {
-  try {
-    if (restored)
-      await admin?.query(`DROP DATABASE "ages_restore_${suffix}" WITH (FORCE)`);
-    if (created) await admin?.query(`DROP DATABASE "${database}" WITH (FORCE)`);
-    if (backupRoleCreated) await admin?.query(`DROP ROLE "${backupRole}"`);
-    if (roleCreated) await admin?.query(`DROP ROLE "${role}"`);
-  } catch {
-    process.exitCode = 1;
-    console.error(
-      `Disposable cleanup failed: administrator must inspect ${database} / ${role}`,
-    );
+  let cleanupOk = true;
+  for (const [enabled, label, sql] of [
+    [
+      restored,
+      "restore database",
+      'DROP DATABASE "ages_restore_' + suffix + '" WITH (FORCE)',
+    ],
+    [
+      created,
+      "source database",
+      'DROP DATABASE "' + database + '" WITH (FORCE)',
+    ],
+    [backupRoleCreated, "backup role", 'DROP ROLE "' + backupRole + '"'],
+    [roleCreated, "runtime role", 'DROP ROLE "' + role + '"'],
+  ] as const) {
+    if (!enabled) continue;
+    try {
+      await admin?.query(sql);
+    } catch {
+      cleanupOk = false;
+      process.exitCode = 1;
+      console.error(
+        "Could not remove disposable " +
+          label +
+          "; inspect this verification run.",
+      );
+    }
   }
-  await admin?.end().catch(() => undefined);
-  if (started && bin && nativeDir)
-    execute(join(bin, "pg_ctl.exe"), [
-      "stop",
-      "-D",
-      join(nativeDir, "data"),
-      "-m",
-      "fast",
-      "-w",
-    ]);
-  if (backupDir && !nativeDir) {
-    const target = resolve(backupDir);
+  await admin?.end().catch(() => {
+    cleanupOk = false;
+    process.exitCode = 1;
+    console.error("Could not close disposable administrator connection.");
+  });
+  let stopped = true;
+  if (started && bin && nativeDir) {
+    try {
+      execute(join(bin, "pg_ctl.exe"), [
+        "stop",
+        "-D",
+        join(nativeDir, "data"),
+        "-m",
+        "fast",
+        "-w",
+      ]);
+    } catch {
+      stopped = false;
+      cleanupOk = false;
+      process.exitCode = 1;
+      console.error(
+        "Could not stop disposable native cluster; inspect .local manually.",
+      );
+    }
+  }
+  const removeDisposable = (directory: string, prefix: string) => {
+    const target = resolve(directory);
     if (
       !target.startsWith(root + sep) ||
-      !target.split(sep).at(-1)?.startsWith("release-backups-")
+      !target.split(sep).at(-1)?.startsWith(prefix)
     ) {
+      cleanupOk = false;
       process.exitCode = 1;
-      console.error("Unsafe dump cleanup path; manual inspection required");
-    } else rmSync(target, { recursive: true, force: true });
-  }
-  if (nativeDir) {
+      console.error(
+        "Unsafe disposable cleanup path; manual inspection required",
+      );
+      return;
+    }
+    try {
+      rmSync(target, { recursive: true, force: true });
+    } catch {
+      cleanupOk = false;
+      process.exitCode = 1;
+      console.error(
+        "Could not remove disposable files; inspect .local manually.",
+      );
+    }
+  };
+  if (backupDir && !nativeDir) removeDisposable(backupDir, "release-backups-");
+  if (nativeDir && stopped) {
     const log = join(nativeDir, "postgres.log");
     if (existsSync(log))
       writeFileSync(join(logs, "postgres.log"), readFileSync(log));
-    const target = resolve(nativeDir);
-    if (
-      !target.startsWith(root + sep) ||
-      !target.split(sep).at(-1)?.startsWith("release-")
-    ) {
-      process.exitCode = 1;
-      console.error("Unsafe native cleanup path; manual inspection required");
-    } else rmSync(target, { recursive: true, force: true });
+    removeDisposable(nativeDir, "release-");
   }
+  if (cleanupOk) console.log("Disposable roles, databases and files removed.");
 }
