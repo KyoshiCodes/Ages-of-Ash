@@ -96,4 +96,27 @@ The additive migration and locked seed preserve existing saves. Deployment brief
 8. Same-origin validation and httpOnly cookies protect mutations; production proxy trust is limited to loopback Caddy.
 9. No raw passwords, cookies or connection strings belong in logs or the repository.
 
-// TODO(agent): Add worker freshness metrics, audit/receipt retention partitions, moderation/report tooling and measured load tests before public launch.
+// TODO(agent): Add audit/receipt retention partitions, moderation/report tooling and measured load tests before public launch.
+
+## Release foundation — 2026-09-22
+
+`packages/gamedata/src/catalog.ts` is the shared canonical catalog list for seed and readiness. `scripts/database-status.ts` compares checked-in migration hashes, failed/pending history, canonical content, world seed and generated Prisma schema. Doctor reads these without mutation. The disposable acceptance runner uses unique PG credentials/database and an isolated Windows native cluster or an explicitly supplied `VERIFY_ADMIN_URL`; it intentionally ignores the ordinary app DATABASE_URL. Migration SQL and repeat seed preserve existing player aggregates. Every production schema change is an explicit release gate.
+
+```mermaid
+flowchart LR
+  CI[verify:full / ephemeral PG] --> M[generate + migrate deploy + seed]
+  M --> T[unit + integration + browser + bundle]
+  Release[reviewed exact commit] --> Gate[explicit migration approval]
+  Gate --> Migrator[ages_migrator]
+  Migrator --> PG[(PostgreSQL 18)]
+  API[ages_api / loopback 3000] --> PG
+  Worker[ages_worker / loopback 3001] --> PG
+  Caddy[public TLS 80/443] --> API
+  Caddy --> Web[static Vite build]
+```
+
+The additive `OperationalStatus` table holds per-job last success/failure, duration, lag and failure count. Worker startup and each scheduled job update it; `/api/ready` requires a fresh worker heartbeat. API/worker metrics expose counters without player data. WebSocket connections are drained on shutdown, and pg-boss stops gracefully while in-flight jobs settle or retry. JSON HTTP logs record generated request IDs, route template, method, status and latency, never request body/query, cookie or raw error. Both Caddy and Fastify set security headers; only the exact APP_ORIGIN may mutate state. Production configuration fails closed on non-HTTPS origins, non-loopback bind, weak ops token or admin DB URL variables.
+
+Analytics is disabled unless `ANALYTICS_ENABLED=true` is deliberately set. The operator query requires `--operator` and emits aggregate cohorts only. Session/telemetry observations retain only action category and timing/counts. A 30-day cleanup command defaults to dry-run and requires an explicit deletion flag; permanent audits and reward receipts are excluded. Backup/restore ownership and non-production verification live in RECOVERY.md. The physical trace protocol is DEVICE_VALIDATION.md.
+
+// TODO(agent): Measure hosted queue retries/lag and database pool saturation; tune readiness/alert thresholds from a real load test.

@@ -3,31 +3,15 @@ import { randomUUID } from "node:crypto";
 import { prisma, closeDatabase } from "./index.ts";
 import { initialState, stateSchema } from "../../engine/src/index.ts";
 import { initializeChronicle } from "../../engine/src/chronicle.ts";
-import { validated } from "../../gamedata/src/schema.ts";
+import { canonicalCatalog } from "../../gamedata/src/catalog.ts";
 import { balance } from "../../gamedata/src/index.ts";
 const id = "00000000-0000-4000-8000-000000000001";
-for (const [kind, entries] of Object.entries({
-  ...validated.content,
-  ...validated.chronicle,
-  balance,
-}))
-  if (Array.isArray(entries))
-    for (const entry of entries) {
-      const key = `${kind}:${entry.id}`;
-      await prisma.contentDefinition.upsert({
-        where: { key },
-        create: { key, kind, definition: entry },
-        update: { definition: entry },
-      });
-    }
-  else {
-    const key = `config:${kind}`;
-    await prisma.contentDefinition.upsert({
-      where: { key },
-      create: { key, kind, definition: entries },
-      update: { definition: entries },
-    });
-  }
+for (const entry of canonicalCatalog())
+  await prisma.contentDefinition.upsert({
+    where: { key: entry.key },
+    create: entry,
+    update: { definition: entry.definition },
+  });
 // Explicit upgrade of legacy aggregates; existing progression and currencies are untouched.
 let cursor: string | undefined;
 for (;;) {

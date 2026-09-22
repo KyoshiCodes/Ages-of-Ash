@@ -1,0 +1,13 @@
+# Physical-device performance and accessibility protocol
+
+Target two devices: a Windows laptop on integrated graphics with a 60 Hz display, and a mid-range Android phone with 4 GB RAM and Chrome stable. Record exact model, OS, browser, battery/power mode, refresh rate, thermal state, release SHA, and network. Do not infer physical results from headless Chromium.
+
+Use a clean browser profile and production build served over HTTPS with a realistic API. For first paint, clear cache and service worker, set a 4 Mbps downstream / 80 ms RTT network profile, then capture Chrome Performance + Network traces. Measure navigation-to-first meaningful playable shell and total eager JS transfer gzip; require under 2 seconds and under 400 KiB. Repeat five cold visits and report median plus worst. Separately measure authenticated return with the API across the intended network, including the Ember Ledger report. `pnpm test:performance` is a repeatable desktop simulation; it does not substitute for device traces.
+
+For frame pacing, record a 60-second DevTools trace on each device at 60 Hz. Flows: run and reveal ten operations, navigate eras, open the supply map and rotate the optional relic, scroll a long codex, receive a WebSocket update, and switch tabs back after a minute. Run with optional 3D disabled and enabled. Aim for at least 95% of frames under 16.7 ms with no interaction stall over 100 ms; record frame-time p50/p95/p99 and any dropped frames. Check that 3D/audio bundles are absent until explicit opt-in, the 2D fallback is complete, audio starts only on gesture, and motion off prevents animation. Test under warm and throttled CPU conditions; avoid claiming stable 60 fps if thermal throttling lowers the device refresh rate.
+
+Accessibility pass: keyboard-only complete register/guest, operation, equipment, holding, boss, leaderboard and logout flows; visible focus; screen-reader names and live-update announcements; 200% text zoom and 320 CSS px width without lost actions; contrast for every era and badge state; reduced motion OS setting and app speed Off; no audio-only information; Android touch target reachability and screen reader navigation. Record failures as issues with device, URL, screenshot and reproduction steps. Verify Android PWA install and offline shell separately; offline actions require reconnection to the authoritative server.
+
+Known limits: no physical-device or hosted authenticated timing has yet been measured. The existing local shell trace and lazy-load E2E are evidence only for desktop Chromium under emulated network conditions.
+
+// TODO(agent): Run this protocol on named physical devices and attach raw traces, measurement table, and accessibility issue IDs to the release candidate.

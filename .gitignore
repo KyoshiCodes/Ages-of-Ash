@@ -11,3 +11,7 @@ test-results/
 .pnpm-store/
 .local/
 SOURCEBOOK.md
+
+artifacts/
+*.dump
+*.dump.partial

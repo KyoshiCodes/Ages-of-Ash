@@ -1,7 +1,6 @@
 /** Idempotent database bootstrap. Admin credentials are optional and never printed. */
 import "dotenv/config";
 import { Client } from "pg";
-import { execute } from "./process.ts";
 const url = new URL(
   process.env.DATABASE_URL ??
     "postgresql://ages:ages_dev_only@localhost:5432/ages",
@@ -36,7 +35,6 @@ const app = new Client({
 await app.connect();
 await app.query("SELECT 1");
 await app.end();
-execute("pnpm", ["db:generate"]);
-// Deploy checked-in migrations avoids granting CREATEDB to the runtime account.
-execute("pnpm", ["db:deploy"]);
-execute("pnpm", ["db:seed"]);
+console.log(
+  "Role/database connectivity ready. Review and explicitly run pnpm db:generate, pnpm db:deploy, and pnpm db:seed.",
+);

@@ -28,7 +28,7 @@ Daily contracts, login streaks, the weekly ten-operation/two-crew contract and t
 
 1. Edit `packages/gamedata/src/content.json` for eras/items/standard operations, `chronicle.json` for contacts, map nodes, lore, achievements and retention tuning, or `balance.json` for base numbers.
 2. Keep stable IDs, reciprocal adjacency, valid item/crew references and acyclic operation prerequisites. Follow the tone bible in ART_DIRECTION before expanding prose.
-3. Run `pnpm exec tsx scripts/validate-content.ts`, add rule/chain tests, then `pnpm verify` and `pnpm setup:db`. The seed upserts content/config rows and upgrades legacy aggregates without resetting progress.
+3. Run `pnpm exec tsx scripts/validate-content.ts`, add rule/chain tests, then `pnpm verify:full`; review and explicitly run `pnpm db:deploy` and `pnpm db:seed` only for the intended persistent development database. The seed upserts content/config rows and upgrades legacy aggregates without resetting progress.
 4. Run database and browser suites for a new system. Content removal requires an explicit compatibility migration for stored IDs; never rename released IDs casually.
 
 Current catalog: twelve standard operations plus four crew operations, twelve items, four contacts, four supply nodes, five lore fragments and four material badges. The pipeline supports hundreds; the current catalog does not pretend to contain them.
@@ -39,4 +39,4 @@ Current catalog: twelve standard operations plus four crew operations, twelve it
 
 No third-party analytics SDK, message text, password, cookie or fingerprint is recorded. Reports are operator CLI output, not public API. Guest and registered identities share progress; the seeded sparring operator is excluded from retention cohorts. Local smoke accounts are test data and must not be presented as product retention evidence.
 
-// TODO(agent): Define production telemetry retention and deletion policy, then add bounded cleanup without deleting permanent reward receipts.
+// TODO(agent): Publish the production privacy notice, assign a retention-cleanup operator, and verify 30-day deletion on a non-production copy without touching reward receipts.

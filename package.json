@@ -26,15 +26,18 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "vitest run tests/unit.test.ts",
+    "test": "vitest run tests/unit.test.ts tests/release.test.ts",
     "test:integration": "vitest run tests/integration.test.ts",
     "test:e2e": "playwright test",
     "build": "tsx scripts/build.ts",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "verify": "pnpm verify:fast",
     "prepare": "node scripts/hooks.mjs",
     "analytics": "tsx scripts/analytics.ts",
     "content:validate": "tsx scripts/validate-content.ts",
-    "test:performance": "tsx scripts/check-performance.ts"
+    "test:performance": "tsx scripts/check-performance.ts",
+    "verify:fast": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "verify:full": "tsx scripts/verify-full.ts",
+    "queue:prepare": "tsx scripts/prepare-queue.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

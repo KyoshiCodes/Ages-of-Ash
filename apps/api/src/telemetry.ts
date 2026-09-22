@@ -8,6 +8,7 @@ export async function recordActivity(
   now: number,
   step?: string,
 ) {
+  if (process.env.ANALYTICS_ENABLED !== "true") return;
   const previous = s.chronicle.sessionId
     ? await tx.playSession.findUnique({ where: { id: s.chronicle.sessionId } })
     : null;

@@ -227,8 +227,9 @@ export function tick(s: PlayerState, now: number) {
   }
   return s;
 }
+export class RuleError extends Error {}
 export function requireRule(ok: unknown, message: string): asserts ok {
-  if (!ok) throw new Error(message);
+  if (!ok) throw new RuleError(message);
 }
 export function spend(
   s: PlayerState,

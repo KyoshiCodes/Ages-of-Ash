@@ -12,15 +12,19 @@ Follow [Windows setup](docs/SETUP.md) first if PostgreSQL 18 is not installed.
 volta install node@24.21.0
 volta install pnpm@12.5.1
 Copy-Item .env.example .env
-pnpm install
+pnpm install --frozen-lockfile
 pnpm run doctor
 pnpm setup:db
+pnpm db:generate
+pnpm db:deploy
+pnpm db:seed
+pnpm run doctor
 pnpm dev
 ```
 
 Open http://localhost:5173. Create an account or enter as a guest, run Cinder Quay operations, spend skills, recruit crew, equip equipment, build a holding, duel the seeded sparring operator and challenge a boss. Use a second browser profile for two-player verification. Guest accounts can be upgraded in the account panel.
 
-Choose an approach, start an operation, then select **Resolve operation** after its three-second clock. The first Ash Cycle needs 60 mastery and a four-hour-old ledger. Returning after two minutes opens a server-calculated recap. Existing installations should run `pnpm setup:db` to apply the additive migration and seed the validated content catalog. Prisma remains pinned at **7.10.0**.
+Choose an approach, start an operation, then select **Resolve operation** after its three-second clock. The first Ash Cycle needs 60 mastery and a four-hour-old ledger. Returning after two minutes opens a server-calculated recap. Existing installations should explicitly run `pnpm db:deploy` and `pnpm db:seed` after reviewing the pending changes; doctor only reports. Prisma remains pinned at **7.10.0**.
 
 ```text
 Browser React ── REST / WebSocket ── Fastify API
@@ -34,7 +38,7 @@ Browser React ── REST / WebSocket ── Fastify API
                                   Node worker       API fan-out
 ```
 
-`pnpm verify` runs typecheck, lint, unit tests and builds. `pnpm test:integration` requires the configured database. `pnpm test:e2e` starts the three application processes and runs Chromium against that database.
+`pnpm verify:fast` (also `pnpm verify`) runs typecheck, lint, unit tests and the production build. `pnpm verify:full` starts an isolated native PostgreSQL 18 database, proves empty-to-migrated-and-seeded setup, repeats migrate/seed, drills backup/restore, and runs the unit, integration, E2E and performance checks. It never migrates the configured persistent DATABASE_URL. See [recovery](docs/RECOVERY.md) and [device validation](docs/DEVICE_VALIDATION.md).
 
 Oracle deployment uses Ubuntu 24.04 ARM64, PostgreSQL, Caddy and two systemd services. See [deployment](deploy/README.md). Read [STATE](docs/STATE.md) for actual verification and release limitations before exposing a server publicly.
 

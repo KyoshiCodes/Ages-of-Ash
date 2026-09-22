@@ -11,6 +11,7 @@ const excluded = new Set([
   "playwright-report",
   ".pnpm-store",
   ".generated",
+  "artifacts",
   ".agents",
   ".codex",
 ]);

@@ -11,6 +11,7 @@ import {
   worldAction,
 } from "../apps/api/src/service.ts";
 import { eventAt } from "../packages/gamedata/src/index.ts";
+process.env.ANALYTICS_ENABLED = "true";
 const ids: string[] = [];
 it("persists offline reports, ledger consequences, supply, prestige and telemetry atomically", async () => {
   const id = randomUUID();
@@ -156,3 +157,76 @@ it("same nonce concurrently rewards exactly once; overspending rolls back", asyn
   expect(stateSchema.parse(row.state).cash).toBe(earned % 100);
   expect(stateSchema.parse(row.state).inventory.bike.quantity).toBe(4);
 }, 20000);
+
+it("disabled analytics makes no session or event writes", async () => {
+  const id = randomUUID();
+  ids.push(id);
+  await prisma.player.create({
+    data: { id, name: "Privacy fixture", state: initialState(Date.now()) },
+  });
+  const enabled = process.env.ANALYTICS_ENABLED;
+  process.env.ANALYTICS_ENABLED = "false";
+  try {
+    await snapshot(id);
+    await performFeature(id, { nonce: randomUUID(), type: "ledger-forge" });
+    expect(await prisma.playSession.count({ where: { playerId: id } })).toBe(0);
+    expect(await prisma.telemetryEvent.count({ where: { playerId: id } })).toBe(
+      0,
+    );
+  } finally {
+    process.env.ANALYTICS_ENABLED = enabled;
+  }
+});
+it("readiness identifies missing content without modifying the database", async () => {
+  const { Client } = await import("pg");
+  const { databaseStatus } = await import("../scripts/database-status.ts");
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  try {
+    expect(await databaseStatus(client)).toEqual([]);
+    await client.query("BEGIN");
+    await client.query('DELETE FROM "ContentDefinition" WHERE key=$1', [
+      "config:offline",
+    ]);
+    expect(await databaseStatus(client)).toContain(
+      "Missing canonical content: config:offline",
+    );
+    await client.query("ROLLBACK");
+    expect(await databaseStatus(client)).toEqual([]);
+  } finally {
+    await client.query("ROLLBACK");
+    await client.end();
+  }
+});
+it("job failure and recovery persist lag and sanitized outcomes", async () => {
+  const { observedJob } =
+    await import("../packages/infrastructure/src/index.ts");
+  const name = "release-test-" + randomUUID();
+  try {
+    await expect(
+      observedJob(
+        name,
+        async () => {
+          throw new Error("private payload must not reach logs");
+        },
+        700,
+        2,
+      ),
+    ).rejects.toThrow("Job failed; inspect operational logs");
+    const failed = await prisma.operationalStatus.findUniqueOrThrow({
+      where: { name },
+    });
+    expect(failed.failures).toBe(1);
+    expect(failed.lagMs).toBe(700);
+    expect(failed.running).toBe(false);
+    await observedJob(name, async () => undefined);
+    const recovered = await prisma.operationalStatus.findUniqueOrThrow({
+      where: { name },
+    });
+    expect(recovered.lastSuccessAt!.getTime()).toBeGreaterThanOrEqual(
+      recovered.lastFailureAt!.getTime(),
+    );
+  } finally {
+    await prisma.operationalStatus.deleteMany({ where: { name } });
+  }
+});

@@ -1,5 +1,6 @@
 /** Windows preflight. Reports only unless --fix is supplied; never installs system software. */
 import "dotenv/config";
+import { databaseStatus, clientStatus } from "./database-status.ts";
 import { execFileSync } from "node:child_process";
 import { totalmem, freemem, platform } from "node:os";
 import { existsSync, readFileSync } from "node:fs";
@@ -203,12 +204,14 @@ report(
   ".env with app database credentials",
   "Copy-Item .env.example .env",
 );
+let databaseProbe: import("pg").Client | undefined;
 try {
   const { Client } = await import("pg");
   const client = new Client({
     connectionString: process.env.DATABASE_URL,
     connectionTimeoutMillis: 3000,
   });
+  databaseProbe = client;
   await client.connect();
   const result = await client.query(
     "SELECT version(), current_user, current_database(), inet_server_port() AS port",
@@ -264,28 +267,56 @@ try {
         "⚠️ Auth mode: app role cannot inspect pg_hba_file_rules. Supply PG_ADMIN_URL for inspection, or as postgres run: SELECT type, auth_method FROM pg_hba_file_rules; require scram-sha-256 for TCP.",
       );
   }
-  await client.end();
-} catch (error) {
+  const issues = await databaseStatus(client);
+  report(
+    issues.length === 0,
+    "Database release readiness",
+    issues.length
+      ? issues.join("\n   ")
+      : "migrations and canonical content match",
+    "committed migrations + canonical seed",
+    "Explicit initialization: pnpm db:deploy; pnpm db:seed",
+  );
+} catch {
   report(
     false,
     "App database probe",
-    error instanceof Error ? error.message : "failed",
+    "connection or readiness check failed (details suppressed to protect credentials)",
     "app role + database + successful TCP auth",
     "Set PG_ADMIN_URL in .env, then pnpm setup:db",
   );
 }
+
+await databaseProbe?.end().catch(() => undefined);
+const mismatch = clientStatus();
+report(
+  !mismatch,
+  "Generated Prisma client",
+  mismatch ?? "7.10.0 schema matches",
+  "schema/client parity",
+  "pnpm db:generate",
+);
 if (process.argv.includes("--fix")) {
-  const { execute } = await import("./process.ts");
-  execute("volta", ["pin", "node@24.21.0"]);
-  execute("volta", ["install", "pnpm@12.5.1"]);
-  execute("pnpm", ["install"]);
-  execute("pnpm", ["setup:db"]);
   console.log(
-    "Safe fixes completed. Run pnpm run doctor again. Browser binary: pnpm exec playwright install chromium",
+    "Authorized remediation: deterministic dependency install and Prisma generation. No system installation.",
   );
+  const { execute } = await import("./process.ts");
+  execute("pnpm", ["install", "--frozen-lockfile"]);
+  execute("pnpm", ["db:generate"]);
+  if (process.argv.includes("--database")) {
+    console.log(
+      "Explicit --database opt-in: applying committed migrations and canonical seed to configured DATABASE_URL.",
+    );
+    execute("pnpm", ["db:deploy"]);
+    execute("pnpm", ["db:seed"]);
+  } else
+    console.log(
+      "Persistent DB unchanged. For explicit DB initialization run pnpm db:deploy then pnpm db:seed.",
+    );
+  console.log("Run pnpm run doctor again to verify remediation.");
 } else {
   console.log(
-    "Remediation: apply printed system fixes yourself; pnpm run doctor --fix pins tools, installs packages, creates app database when authorized by PG_ADMIN_URL, generates, migrates and seeds.",
+    "Read-only checks completed. doctor + verify:fast do not prove DB acceptance. Run verify:full for a disposable database.",
   );
   process.exitCode = failures ? 1 : 0;
 }

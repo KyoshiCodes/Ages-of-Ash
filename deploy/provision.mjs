@@ -86,7 +86,7 @@ writeFileSync("/etc/caddy/Caddyfile", caddy);
 if (!existsSync("/etc/ages/ages.env")) {
   writeFileSync(
     "/etc/ages/ages.env",
-    `DATABASE_URL=postgresql://ages:REPLACE_ME@127.0.0.1:5432/ages\nAPP_ORIGIN=https://${domain}\nNODE_ENV=production\nHOST=127.0.0.1\nPORT=3000\n`,
+    `DATABASE_URL=postgresql://ages_api:REPLACE_ME@127.0.0.1:5432/ages\nAPP_ORIGIN=https://${domain}\nNODE_ENV=production\nHOST=127.0.0.1\nPORT=3000\nWORKER_PORT=3001\nANALYTICS_ENABLED=false\nOPS_TOKEN=REPLACE_WITH_32_RANDOM_CHARACTERS\n`,
   );
   chmodSync("/etc/ages/ages.env", 0o640);
   run("chown", ["root:ages", "/etc/ages/ages.env"]);

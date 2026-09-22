@@ -1,5 +1,14 @@
 /** Operator-only retention report. Rolling cohorts exclude players who have not aged into a return window. */
 import { prisma, closeDatabase } from "../packages/database/src/index.ts";
+if (
+  process.env.ANALYTICS_ENABLED !== "true" ||
+  !process.argv.includes("--operator")
+) {
+  await closeDatabase();
+  throw new Error(
+    "Operator-only: explicitly enable analytics and pass --operator; see runbook",
+  );
+}
 const retention =
   await prisma.$queryRaw`SELECT d AS day, count(*)::int AS eligible, count(*) FILTER(WHERE EXISTS(SELECT 1 FROM "PlaySession" s WHERE s."playerId"=p.id AND s."startedAt">=p."createdAt"+d*interval '1 day' AND s."startedAt"<p."createdAt"+(d+1)*interval '1 day'))::int AS returned FROM "Player" p CROSS JOIN (VALUES(1),(7)) days(d) WHERE p."createdAt"<=now()-(d+1)*interval '1 day' AND p.id<>'00000000-0000-4000-8000-000000000001'::uuid GROUP BY d ORDER BY d`;
 const sessions =

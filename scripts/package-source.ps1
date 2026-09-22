@@ -6,7 +6,7 @@ $workspaceRoot = (Get-Location).Path
 $outputDirectory = Join-Path $workspaceRoot '.generated'
 [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
 $archivePath = Join-Path $outputDirectory 'Ages-of-Ash.zip'
-$excluded = @('node_modules','.git','.local','dist','coverage','test-results','playwright-report','.pnpm-store','.generated','.agents','.codex')
+$excluded = @('artifacts','node_modules','.git','.local','dist','coverage','test-results','playwright-report','.pnpm-store','.generated','.agents','.codex')
 function Add-SourceFiles([string]$Directory, $Archive) {
   foreach ($entry in Get-ChildItem -LiteralPath $Directory -Force) {
     if ($excluded -contains $entry.Name) { continue }

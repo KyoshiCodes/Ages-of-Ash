@@ -15,11 +15,9 @@ await build({
   target: "node24",
   sourcemap: true,
 });
-execute("pnpm", [
-  "exec",
-  "vite",
-  "build",
-  "--config",
-  "apps/web/vite.config.ts",
-]);
+execute(
+  "pnpm",
+  ["exec", "vite", "build", "--config", "apps/web/vite.config.ts"],
+  { ...process.env, NODE_ENV: "production" },
+);
 await import("./performance-budget.ts");

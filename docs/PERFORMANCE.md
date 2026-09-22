@@ -17,3 +17,5 @@ Local planning RSS remains one PostgreSQL service (roughly 150–500 MB), API (1
 // TODO(agent): Profile a physical integrated-GPU laptop and mid-range Android at 60 Hz; record frame-time percentiles for operations, supply inspection and relic rotation.
 // TODO(agent): Measure authenticated first meaningful paint with deployed API latency and a cold 4 Mbps connection; retain a trace with the release.
 // TODO(agent): Run a screen-reader/keyboard audit and Android PWA install/offline verification on physical devices.
+
+The repeatable physical test matrix and acceptance measurements are in [DEVICE_VALIDATION.md](DEVICE_VALIDATION.md). The latest 2026-09-22 disposable-database run built **165.3 KiB gzip** initial JavaScript, loaded no optional media initially, and measured **901 ms** signed-out shell readiness at emulated 4 Mbps/80 ms. These are local desktop Chromium results. Physical integrated graphics, Android frame pacing and hosted authenticated paint remain unmeasured.

@@ -32,3 +32,10 @@
 - ADR-030: Original generated Opus loops are streamed only after an explicit enable gesture, default muted, and paused when hidden; no external audio license is required.
 - ADR-031: Initial JS is gated at 400 KiB gzip; 60 fps remains a physical integrated-GPU/mobile validation target, not a claim inferred from headless browser tests.
 - ADR-032: Content/aggregate seeding runs during a brief deployment maintenance window so an older worker cannot overwrite new aggregate fields; code rollback never rolls back schema.
+- ADR-033: `pnpm verify` aliases fast checks; `verify:full` alone proves a fresh, seeded disposable database through integration, E2E and performance.
+- ADR-034: Doctor is read-only by default; database changes require direct commands or the explicit `--fix --database` opt-in.
+- ADR-035: Production uses separate migrator, API and worker roles; the exact-commit release prepares safely and migrates only behind `--approve-migrations`.
+- ADR-036: Analytics collection defaults disabled; operator aggregate queries and 30-day cleanup require explicit action, with no automatic deletion of audits or reward receipts.
+- ADR-037: Readiness requires canonical data and a fresh worker heartbeat; liveness remains cheap, and internal metrics are loopback-only with a token.
+- ADR-038: Native backup/restore drills use an empty `ages_restore_*` target; a populated target is rejected and production restore needs a separate incident decision.
+- ADR-039: `pnpm setup:db` creates/probes the configured role and database only; `db:generate`, `db:deploy`, and `db:seed` are separately explicit developer actions.

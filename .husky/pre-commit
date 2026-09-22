@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-/** Native Node hook; executes identical checks across supported Git platforms. */
-import { spawnSync } from "node:child_process";
-for (const task of ["lint", "typecheck"]) {
-  const result = spawnSync("pnpm", [task], {
-    stdio: "inherit",
-    shell: process.platform === "win32",
-  });
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
+/** Native hook; all arguments stay literal and failures stop the commit. */
+import { execute } from "../scripts/process.ts";
+for (const task of ["lint", "typecheck"]) execute("pnpm", [task]);

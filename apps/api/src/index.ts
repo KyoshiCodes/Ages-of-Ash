@@ -1,9 +1,14 @@
 /** HTTP and live boundary. Same-origin sessions, strict input validation, rate limits and opaque errors. */
 import "dotenv/config";
-import Fastify from "fastify";
+import Fastify, { LogController } from "fastify";
 import cookie from "@fastify/cookie";
 import websocket from "@fastify/websocket";
-import { randomBytes, createHash } from "node:crypto";
+import {
+  randomBytes,
+  createHash,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 import argon2 from "argon2";
 import { z } from "zod";
 import { prisma, closeDatabase } from "../../../packages/database/src/index.ts";
@@ -11,6 +16,7 @@ import {
   initialState,
   actionSchema,
   requireRule,
+  RuleError,
   stateSchema,
   tick,
 } from "../../../packages/engine/src/index.ts";
@@ -34,24 +40,55 @@ import {
   performFeature,
 } from "./service.ts";
 import type { WebSocket } from "ws";
-const env = z
-  .object({
-    APP_ORIGIN: z.url(),
-    PORT: z.coerce.number().default(3000),
-    HOST: z.string().default("127.0.0.1"),
-    NODE_ENV: z.string().default("development"),
-  })
-  .parse(process.env);
+import {
+  runtimeConfig,
+  errorKind,
+  healthStats,
+  operationLog,
+} from "../../../packages/infrastructure/src/operations.ts";
+import { readiness } from "./readiness.ts";
+const env = runtimeConfig(process.env);
+let draining = false;
 const app = Fastify({
   logger: {
+    serializers: {
+      req: () => ({}),
+      res: () => ({}),
+      err: (error: unknown) => ({
+        type: "Error",
+        message: errorKind(error),
+        stack: "",
+        code: errorKind(error),
+      }),
+    },
     redact: [
       "req.headers.cookie",
       "req.headers.authorization",
       "res.headers.set-cookie",
     ],
   },
+  logController: new LogController({ disableRequestLogging: true }),
+  genReqId: () => randomUUID(),
   bodyLimit: 16384,
   trustProxy: env.NODE_ENV === "production" ? "127.0.0.1" : false,
+  requestTimeout: 15000,
+  connectionTimeout: 20000,
+  return503OnClosing: true,
+});
+app.addHook("onResponse", async (req, reply) => {
+  const duration = Math.round(reply.elapsedTime);
+  healthStats.requests++;
+  healthStats.totalLatencyMs += duration;
+  healthStats.maxLatencyMs = Math.max(healthStats.maxLatencyMs, duration);
+  if (reply.statusCode >= 500) healthStats.errors++;
+  req.log.info({
+    event: "http_response",
+    requestId: req.id,
+    route: req.routeOptions.url ?? "unmatched",
+    method: req.method,
+    status: reply.statusCode,
+    durationMs: duration,
+  });
 });
 await app.register(cookie);
 await app.register(websocket, { options: { maxPayload: 4096 } });
@@ -59,7 +96,7 @@ const pubsub = new PostgresPubSub(),
   cache = new MemoryCache();
 const peers = new Map<
   WebSocket,
-  { id: string; expires: number; token: string }
+  { id: string; expires: number; token: string; alive: boolean }
 >();
 const hash = (token: string) =>
   createHash("sha256").update(token).digest("hex");
@@ -89,7 +126,32 @@ app.decorateRequest("playerId", "");
 app.addHook("onRequest", async (req, reply) => {
   reply
     .header("X-Content-Type-Options", "nosniff")
-    .header("Cache-Control", "no-store");
+    .header("Cache-Control", "no-store")
+    .header("X-Request-ID", req.id)
+    .header("Referrer-Policy", "no-referrer")
+    .header("X-Frame-Options", "DENY")
+    .header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    .header(
+      "Content-Security-Policy",
+      "default-src 'none'; frame-ancestors 'none'",
+    );
+  if (env.NODE_ENV === "production")
+    reply.header("Strict-Transport-Security", "max-age=31536000");
+  if (draining) return reply.code(503).send({ error: "Service draining" });
+  if (["/api/live", "/api/health", "/api/ready"].includes(req.url)) return;
+  if (req.url === "/internal/metrics") {
+    const supplied = req.headers.authorization ?? "",
+      expected = "Bearer " + env.OPS_TOKEN;
+    if (
+      !env.OPS_TOKEN ||
+      Buffer.byteLength(supplied) !== Buffer.byteLength(expected) ||
+      !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))
+    )
+      return reply.code(404).send({ error: "Not found" });
+    return;
+  }
+  if (req.headers.origin && req.headers.origin !== env.APP_ORIGIN)
+    return reply.code(403).send({ error: "Origin rejected" });
   if (!(await allowRate(`ip:${req.ip}`, 300, 60)))
     return reply.code(429).send({ error: "Slow down" });
   if (
@@ -103,7 +165,11 @@ app.addHook("onRequest", async (req, reply) => {
   req.playerId = session.playerId;
 });
 app.setErrorHandler((error, req, reply) => {
-  req.log.error(error);
+  req.log.error({
+    event: "request_error",
+    requestId: req.id,
+    code: errorKind(error),
+  });
   const typed = error as Error & { code?: string };
   if (error instanceof z.ZodError)
     return reply.code(400).send({
@@ -114,7 +180,7 @@ app.setErrorHandler((error, req, reply) => {
     return reply.code(409).send({ error: "Already exists or nonce collision" });
   if (typed.code === "P2025")
     return reply.code(404).send({ error: "Not found" });
-  const safe = typed.message && !typed.message.includes("\n") && !typed.code;
+  const safe = error instanceof RuleError;
   reply
     .code(safe ? 400 : 500)
     .send({ error: safe ? typed.message : "Request failed; try again" });
@@ -139,9 +205,20 @@ async function issueSession(
     maxAge: 7 * 86400,
   });
 }
-app.get("/api/health", async () => {
-  await prisma.$queryRaw`SELECT 1`;
-  return { ok: true };
+app.get("/api/live", async () => ({ ok: !draining }));
+app.get("/api/ready", async (_req, reply) => {
+  const status = await readiness();
+  return reply.code(status.ok ? 200 : 503).send(status);
+});
+app.get("/internal/metrics", async () => ({
+  ...healthStats,
+  webSockets: peers.size,
+  readiness: await readiness(),
+  worker: await prisma.operationalStatus.findMany(),
+}));
+app.get("/api/health", async (_req, reply) => {
+  const status = await readiness(false);
+  return reply.code(status.ok ? 200 : 503).send({ ok: status.ok });
 });
 app.post("/api/auth/guest", async (req, reply) => {
   z.object({})
@@ -428,7 +505,7 @@ async function channelFor(playerId: string, channel: string) {
     await prisma.player.findUniqueOrThrow({ where: { id: other } });
     return `mail:${[playerId, other].sort().join(":")}`;
   }
-  throw new Error("Unknown channel");
+  throw new RuleError("Unknown channel");
 }
 app.get("/api/messages", async (req) => {
   const q = z
@@ -503,9 +580,18 @@ app.get("/live", { websocket: true }, async (socket, req) => {
     id: session.playerId,
     expires: session.expiresAt.getTime(),
     token: session.token,
+    alive: true,
+  });
+  healthStats.wsConnections++;
+  socket.on("pong", () => {
+    const peer = peers.get(socket);
+    if (peer) peer.alive = true;
   });
   socket.on("close", () => peers.delete(socket));
-  socket.on("error", () => peers.delete(socket));
+  socket.on("error", () => {
+    healthStats.wsDropped++;
+    peers.delete(socket);
+  });
   socket.send(JSON.stringify({ type: "state" }));
 });
 await pubsub.start((event) => {
@@ -518,22 +604,52 @@ await pubsub.start((event) => {
     if (event.playerId && event.playerId !== peer.id) continue;
     if (socket.readyState === 1 && socket.bufferedAmount < 65536)
       socket.send(JSON.stringify({ type: event.type }));
+    else healthStats.wsDropped++;
   }
 });
 const heartbeat = setInterval(() => {
   for (const socket of peers.keys()) {
+    const peer = peers.get(socket);
+    if (peer && !peer.alive) {
+      healthStats.wsDropped++;
+      socket.terminate();
+      peers.delete(socket);
+      continue;
+    }
+    if (peer) peer.alive = false;
     if (socket.readyState === 1) socket.ping();
     else peers.delete(socket);
   }
 }, 30000);
 await app.listen({ port: env.PORT, host: env.HOST });
+
+async function shutdown() {
+  if (draining) return;
+  draining = true;
+  operationLog("api_draining");
+  clearInterval(heartbeat);
+  const deadline = setTimeout(() => {
+    operationLog("api_shutdown_timeout");
+    process.exit(1);
+  }, 25000);
+  deadline.unref();
+  const closeSockets = setTimeout(() => {
+    for (const socket of peers.keys()) socket.terminate();
+  }, 1000);
+  closeSockets.unref();
+  try {
+    for (const socket of peers.keys()) socket.close(1001, "Restart");
+    await app.close();
+    await pubsub.stop();
+    await closeDatabase();
+    operationLog("api_stopped");
+  } catch (error) {
+    operationLog("api_shutdown_failed", { code: errorKind(error) });
+    process.exitCode = 1;
+  } finally {
+    clearTimeout(deadline);
+    clearTimeout(closeSockets);
+  }
+}
 for (const signal of ["SIGINT", "SIGTERM"] as const)
-  process.once(signal, () => {
-    void (async () => {
-      clearInterval(heartbeat);
-      for (const socket of peers.keys()) socket.close(1001, "Restart");
-      await app.close();
-      await pubsub.stop();
-      await closeDatabase();
-    })();
-  });
+  process.once(signal, () => void shutdown());

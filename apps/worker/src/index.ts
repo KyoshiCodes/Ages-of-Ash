@@ -1,6 +1,9 @@
 /** Scheduled catch-up worker. Elapsed timestamps make duplicate runs and sleeping laptops safe. */
 import { prisma, closeDatabase } from "../../../packages/database/src/index.ts";
-import { PostgresQueue } from "../../../packages/infrastructure/src/index.ts";
+import {
+  PostgresQueue,
+  observedJob,
+} from "../../../packages/infrastructure/src/index.ts";
 import {
   stateSchema,
   tick,
@@ -8,6 +11,16 @@ import {
 } from "../../../packages/engine/src/index.ts";
 import { balance } from "../../../packages/gamedata/src/index.ts";
 import { notify, lockPlayers } from "../../api/src/service.ts";
+import { createServer } from "node:http";
+import {
+  runtimeConfig,
+  operationLog,
+  errorKind,
+  healthStats,
+} from "../../../packages/infrastructure/src/operations.ts";
+import { readiness } from "../../api/src/readiness.ts";
+const config = runtimeConfig(process.env);
+let draining = false;
 const queue = new PostgresQueue();
 await queue.start();
 async function clocks() {
@@ -20,7 +33,8 @@ async function clocks() {
       select: { id: true },
     });
     if (!players.length) break;
-    for (const p of players)
+    for (const p of players) {
+      if (draining) throw new Error("Worker draining; catch-up retries safely");
       await prisma.$transaction(async (tx) => {
         await lockPlayers(tx, [p.id]);
         const player = await tx.player.findUniqueOrThrow({
@@ -46,6 +60,7 @@ async function clocks() {
         });
         await notify(tx, p.id);
       });
+    }
     cursor = players.at(-1)!.id;
   }
 }
@@ -71,13 +86,44 @@ async function timers() {
 }
 await queue.schedule("clocks-income-leaderboard", "* * * * *", clocks);
 await queue.schedule("event-session-timers", "*/5 * * * *", timers);
-await clocks();
-await timers();
-console.log("Ages worker ready");
+
+const server = createServer(async (req, res) => {
+  const status = await readiness();
+  res.setHeader("content-type", "application/json");
+  if (req.url === "/ready") {
+    res.statusCode = !draining && status.ok ? 200 : 503;
+    res.end(JSON.stringify({ ok: !draining && status.ok }));
+  } else if (req.url === "/metrics") {
+    res.end(JSON.stringify({ ...healthStats, draining, readiness: status }));
+  } else {
+    res.statusCode = 404;
+    res.end();
+  }
+});
+await new Promise<void>((r, j) => {
+  server.once("error", j);
+  server.listen(config.WORKER_PORT, "127.0.0.1", r);
+});
+async function shutdown() {
+  if (draining) return;
+  draining = true;
+  operationLog("worker_draining");
+  const deadline = setTimeout(() => process.exit(1), 55000);
+  deadline.unref();
+  try {
+    await new Promise<void>((r) => server.close(() => r()));
+    await queue.stop();
+    await closeDatabase();
+    operationLog("worker_stopped");
+  } catch (error) {
+    operationLog("worker_shutdown_failed", { code: errorKind(error) });
+    process.exitCode = 1;
+  } finally {
+    clearTimeout(deadline);
+  }
+}
 for (const signal of ["SIGINT", "SIGTERM"] as const)
-  process.once(signal, () => {
-    void (async () => {
-      await queue.stop();
-      await closeDatabase();
-    })();
-  });
+  process.once(signal, () => void shutdown());
+await observedJob("clocks-income-leaderboard", clocks);
+await observedJob("event-session-timers", timers);
+console.log("Ages worker ready");

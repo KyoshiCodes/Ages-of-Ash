@@ -1,10 +1,39 @@
-/** Execute trusted project commands on Windows and Linux; reject failed child processes. */
+/** Execute argument arrays without a shell, including package-manager scripts on Windows. */
 import { spawnSync } from "node:child_process";
-export function execute(command: string, args: string[]) {
-  const result = spawnSync(command, args, {
+import { existsSync } from "node:fs";
+export function commandSpec(command: string, args: string[]) {
+  if (
+    command === "pnpm" &&
+    process.env.npm_execpath &&
+    existsSync(process.env.npm_execpath)
+  )
+    return process.env.npm_execpath.endsWith(".exe")
+      ? { command: process.env.npm_execpath, args }
+      : {
+          command: process.execPath,
+          args: [process.env.npm_execpath, ...args],
+        };
+  return {
+    command:
+      process.platform === "win32" && !command.endsWith(".exe")
+        ? `${command}.exe`
+        : command,
+    args,
+  };
+}
+export function execute(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  const spec = commandSpec(command, args);
+  const result = spawnSync(spec.command, spec.args, {
     stdio: "inherit",
-    shell: process.platform === "win32",
+    shell: false,
+    env,
   });
   if (result.error || result.status !== 0)
-    throw result.error ?? new Error(`${command} failed (${result.status})`);
+    throw new Error(
+      `${command} failed (${result.status ?? result.error?.name})`,
+    );
 }

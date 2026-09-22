@@ -9,6 +9,12 @@ import {
   rmSync,
 } from "node:fs";
 const run = (cmd, args) => execFileSync(cmd, args, { stdio: "inherit" });
+const approved = process.argv.includes("--approve-migrations");
+const commit = process.argv.find((x) => x.startsWith("--commit="))?.slice(9);
+if (!commit || !/^[0-9a-f]{40}$/.test(commit))
+  throw new Error(
+    "Specify an exact CI-verified --commit=<40-character SHA>. Without --approve-migrations this only prepares the release.",
+  );
 if (process.getuid?.() !== 0) throw new Error("Run with sudo");
 const root = "/srv/ages",
   source = `${root}/source`,
@@ -35,6 +41,18 @@ run("runuser", [
   "origin",
   "main",
 ]);
+run("runuser", [
+  "-u",
+  "ages",
+  "--",
+  "git",
+  "-C",
+  source,
+  "merge-base",
+  "--is-ancestor",
+  commit,
+  "origin/main",
+]);
 mkdirSync(release);
 run("chown", ["ages:ages", release]);
 run("runuser", [
@@ -48,29 +66,64 @@ run("runuser", [
   "add",
   "--detach",
   release,
-  "origin/main",
+  commit,
 ]);
 const { readFileSync } = await import("node:fs");
-const env = Object.fromEntries(
-  readFileSync("/etc/ages/ages.env", "utf8")
-    .split("\n")
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => {
-      const i = line.indexOf("=");
-      return [line.slice(0, i), line.slice(i + 1)];
-    }),
-);
+const readEnv = (path) =>
+  Object.fromEntries(
+    readFileSync(path, "utf8")
+      .split("\n")
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => {
+        const i = line.indexOf("=");
+        return [line.slice(0, i), line.slice(i + 1)];
+      }),
+  );
+const env = readEnv("/etc/ages/ages.env");
+const workerEnv = { ...env, ...readEnv("/etc/ages/worker.env") };
+const migrationEnv = approved ? readEnv("/etc/ages/migrate.env") : {};
+if (
+  approved &&
+  (!migrationEnv.DATABASE_URL || migrationEnv.DATABASE_URL === env.DATABASE_URL)
+)
+  throw new Error("Migration and runtime DB identities must be distinct");
 for (const args of [
-  ["install", "--frozen-lockfile"],
+  ["install", "--frozen-lockfile", "--prod=false"],
   ["db:generate"],
-  ["verify"],
-  ["db:deploy"],
+  ["verify:fast"],
 ])
   execFileSync("runuser", ["-u", "ages", "--", "pnpm", ...args], {
     cwd: release,
     stdio: "inherit",
     env: { ...process.env, ...env },
   });
+if (!approved) {
+  console.log(
+    "Prepared " +
+      release +
+      ". No database changes. Review migration SQL and backup evidence, then rerun this exact commit with --approve-migrations.",
+  );
+  process.exit(0);
+}
+execFileSync("runuser", ["-u", "ages", "--", "pnpm", "db:deploy"], {
+  cwd: release,
+  stdio: "inherit",
+  env: { ...process.env, ...migrationEnv },
+});
+execFileSync(
+  "runuser",
+  [
+    "-u",
+    "ages",
+    "--",
+    "pnpm",
+    "exec",
+    "tsx",
+    "scripts/apply-runtime-grants.ts",
+    "--approved",
+  ],
+  { cwd: release, stdio: "inherit", env: { ...process.env, ...migrationEnv } },
+);
 const previous = existsSync(`${root}/current`)
   ? readlinkSync(`${root}/current`)
   : undefined;
@@ -80,8 +133,13 @@ try {
   execFileSync("runuser", ["-u", "ages", "--", "pnpm", "db:seed"], {
     cwd: release,
     stdio: "inherit",
-    env: { ...process.env, ...env },
+    env: { ...process.env, ...migrationEnv },
   });
+  execFileSync(
+    "runuser",
+    ["-u", "ages", "--", "pnpm", "queue:prepare", "--approved"],
+    { cwd: release, stdio: "inherit", env: { ...process.env, ...workerEnv } },
+  );
 } catch (error) {
   if (previous) run("systemctl", ["start", "ages-api", "ages-worker"]);
   throw error;
@@ -94,7 +152,7 @@ run("systemctl", ["restart", "ages-api", "ages-worker"]);
 let healthy = false;
 for (let attempt = 0; attempt < 30; attempt++) {
   try {
-    const res = await fetch("http://127.0.0.1:3000/api/health");
+    const res = await fetch("http://127.0.0.1:3000/api/ready");
     if (res.ok) {
       healthy = true;
       break;
@@ -105,13 +163,13 @@ for (let attempt = 0; attempt < 30; attempt++) {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 }
 if (!healthy) {
-  if (previous) {
+  if (previous && process.argv.includes("--allow-code-rollback")) {
     symlinkSync(previous, `${root}/rollback`);
     renameSync(`${root}/rollback`, `${root}/current`);
     run("systemctl", ["restart", "ages-api", "ages-worker"]);
   }
   throw new Error(
-    "Health check failed; previous code restored when available. Schema was not rolled back.",
+    "Readiness failed. Code rollback requires --allow-code-rollback and backward-compatible migrations. Schema/data were not rolled back.",
   );
 }
 run("caddy", ["validate", "--config", "/etc/caddy/Caddyfile"]);

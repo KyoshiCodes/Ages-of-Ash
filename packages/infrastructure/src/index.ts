@@ -3,7 +3,8 @@ import { LRUCache } from "lru-cache";
 import { PgBoss } from "pg-boss";
 import pg from "pg";
 import { z } from "zod";
-import { connectionString, pool } from "../../database/src/index.ts";
+import { connectionString, pool, prisma } from "../../database/src/index.ts";
+import { healthStats, operationLog, errorKind } from "./operations.ts";
 export interface CacheStore {
   get(key: string): unknown;
   set(key: string, value: object): void;
@@ -31,22 +32,40 @@ export interface QueueDriver {
   stop(): Promise<void>;
 }
 export class PostgresQueue implements QueueDriver {
-  private boss = new PgBoss({ connectionString: connectionString!, max: 2 });
+  private boss = new PgBoss({
+    connectionString: connectionString!,
+    max: 2,
+    migrate: process.env.NODE_ENV !== "production",
+    createSchema: process.env.NODE_ENV !== "production",
+  });
   constructor() {
-    this.boss.on("error", (error) => console.error("Queue error", error));
+    this.boss.on("error", (error) =>
+      operationLog("queue_error", { code: errorKind(error) }),
+    );
   }
   async start() {
     await this.boss.start();
   }
   async schedule(name: string, cron: string, handler: () => Promise<void>) {
-    await this.boss.createQueue(name);
-    await this.boss.work(name, async () => {
-      await handler();
+    if (process.env.NODE_ENV !== "production")
+      await this.boss.createQueue(name, {
+        retryLimit: 3,
+        retryDelay: 15,
+        retryBackoff: true,
+      });
+    await this.boss.work(name, { includeMetadata: true }, async (jobs) => {
+      for (const job of jobs)
+        await observedJob(
+          name,
+          handler,
+          Math.max(0, Date.now() - job.startAfter.getTime()),
+          job.retryCount,
+        );
     });
     await this.boss.schedule(name, cron, {}, { singletonKey: name });
   }
   async stop() {
-    await this.boss.stop();
+    await this.boss.stop({ graceful: true, timeout: 45000 });
   }
 }
 export interface LiveEvent {
@@ -79,10 +98,11 @@ export class PostgresPubSub implements PubSub {
         try {
           handler(liveSchema.parse(JSON.parse(msg.payload)));
         } catch {
-          console.error("Malformed notification");
+          operationLog("notification_invalid");
         }
     });
     client.on("error", () => {
+      operationLog("notification_disconnected");
       void client.end().catch(() => undefined);
     });
     client.on("end", () => {
@@ -124,4 +144,47 @@ export async function allowRate(key: string, limit: number, seconds: number) {
     [key, seconds],
   );
   return result.rows[0].count <= limit;
+}
+
+/** Persist aggregate job outcomes; queue failures contain no player state or raw database errors. */
+export async function observedJob(
+  name: string,
+  handler: () => Promise<void>,
+  lagMs = 0,
+  retries = 0,
+) {
+  const start = Date.now();
+  healthStats.jobLagMs = lagMs;
+  healthStats.jobRetries += retries;
+  await prisma.operationalStatus.upsert({
+    where: { name },
+    create: { name, running: true, lagMs },
+    update: { running: true, lagMs },
+  });
+  operationLog("job_started", { job: name, lagMs, retries });
+  try {
+    await handler();
+    const durationMs = Date.now() - start;
+    healthStats.jobDurationMs = durationMs;
+    await prisma.operationalStatus.update({
+      where: { name },
+      data: { running: false, lastSuccessAt: new Date(), durationMs },
+    });
+    operationLog("job_completed", { job: name, durationMs });
+  } catch (error) {
+    healthStats.jobFailures++;
+    await prisma.operationalStatus
+      .update({
+        where: { name },
+        data: {
+          running: false,
+          lastFailureAt: new Date(),
+          failures: { increment: 1 },
+          durationMs: Date.now() - start,
+        },
+      })
+      .catch(() => undefined);
+    operationLog("job_failed", { job: name, code: errorKind(error), retries });
+    throw new Error("Job failed; inspect operational logs");
+  }
 }

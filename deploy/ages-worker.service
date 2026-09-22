@@ -7,6 +7,7 @@ User=ages
 Group=ages
 WorkingDirectory=/srv/ages/current
 EnvironmentFile=/etc/ages/ages.env
+EnvironmentFile=/etc/ages/worker.env
 ExecStart=/usr/bin/node --enable-source-maps dist/worker.js
 Restart=always
 RestartSec=3
