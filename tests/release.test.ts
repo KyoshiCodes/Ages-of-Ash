@@ -1,5 +1,8 @@
 /** Release invariants: safe argument boundaries, secret-free diagnostics and secure production defaults. */
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { commandSpec } from "../scripts/process.ts";
 import {
   runtimeConfig,
@@ -10,6 +13,35 @@ describe("release foundation", () => {
     const args = ["a b", "$(danger)", "x&y", "`x`"];
     const result = commandSpec("git", args);
     expect(result.args).toEqual(args);
+  });
+  it("launches pnpm as an executable on Linux even when npm_execpath names an ELF shim", () => {
+    const directory = mkdtempSync(join(tmpdir(), "ages-pnpm-shim-"));
+    const shim = join(directory, "pnpm.cjs");
+    writeFileSync(shim, Buffer.from([0x7f, 0x45, 0x4c, 0x46]));
+    const previous = process.env.npm_execpath;
+    process.env.npm_execpath = shim;
+    try {
+      expect(commandSpec("pnpm", ["setup:db"], "linux")).toEqual({
+        command: "pnpm",
+        args: ["setup:db"],
+      });
+    } finally {
+      if (previous === undefined) delete process.env.npm_execpath;
+      else process.env.npm_execpath = previous;
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+  it("uses native Windows executable shims without shell or Node dispatch", () => {
+    expect(commandSpec("pnpm", ["verify:fast"], "win32")).toEqual({
+      command: "pnpm.exe",
+      args: ["verify:fast"],
+    });
+    expect(
+      commandSpec("C:/PostgreSQL/bin/pg_dump.exe", ["--version"], "win32"),
+    ).toEqual({
+      command: "C:/PostgreSQL/bin/pg_dump.exe",
+      args: ["--version"],
+    });
   });
   it("defaults analytics off", () => {
     expect(

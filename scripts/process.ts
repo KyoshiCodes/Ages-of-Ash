@@ -1,26 +1,21 @@
-/** Execute argument arrays without a shell, including package-manager scripts on Windows. */
+/** Execute native commands with literal argument arrays; never interpret a package-manager shim as JavaScript. */
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-export function commandSpec(command: string, args: string[]) {
-  if (
-    command === "pnpm" &&
-    process.env.npm_execpath &&
-    existsSync(process.env.npm_execpath)
-  )
-    return process.env.npm_execpath.endsWith(".exe")
-      ? { command: process.env.npm_execpath, args }
-      : {
-          command: process.execPath,
-          args: [process.env.npm_execpath, ...args],
-        };
+
+export function commandSpec(
+  command: string,
+  args: string[],
+  platform: NodeJS.Platform = process.platform,
+) {
   return {
     command:
-      process.platform === "win32" && !command.endsWith(".exe")
+      // Node 24 cannot spawn .cmd with shell:false; Volta supplies the native .exe shim.
+      platform === "win32" && !command.endsWith(".exe")
         ? `${command}.exe`
         : command,
     args,
   };
 }
+
 export function execute(
   command: string,
   args: string[],
