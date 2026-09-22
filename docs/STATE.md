@@ -10,7 +10,7 @@ Production design separates migration, API and worker database roles. The releas
 
 ## Backup/restore parity in progress
 
-The new acceptance path requires PostgreSQL 18 client tools on both platforms and always runs a custom-format dump, empty-target restore and populated-target refusal before gameplay tests. It compares schema, migration records, canonical content, player state, PlaySession, TelemetryEvent and OperationalStatus, then removes generated roles, databases and dump files. The hosted job installs pinned PostgreSQL 18.6 clients from the signed PGDG noble source; its first run is pending. Dumps stay under ignored .local, outside uploaded failure artifacts. OCI staging and off-host recovery remain unverified.
+The new acceptance path requires PostgreSQL 18 client tools on both platforms and always runs a custom-format dump, empty-target restore and populated-target refusal before gameplay tests. It compares schema, migration records, canonical content, player state, PlaySession, TelemetryEvent and OperationalStatus, then removes generated roles, databases and dump files. The hosted job installs pinned PostgreSQL 18.6 clients from the signed PGDG noble source; the first hosted parity run (35797835277) stopped at client installation because a pool-listed package revision was absent from the active PGDG index; the corrected index-pinned retry is pending. Dumps stay under ignored .local, outside uploaded failure artifacts. OCI staging and off-host recovery remain unverified.
 
 ## Latest local verification
 

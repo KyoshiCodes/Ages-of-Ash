@@ -40,7 +40,9 @@ jobs:
           sudo curl --fail --silent --show-error --location --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
           sudo install -m 0644 .github/pgdg.sources /etc/apt/sources.list.d/pgdg.sources
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client-18=18.6-3.pgdg24.04+1
+          node -e "require('node:fs').mkdirSync('artifacts/release',{recursive:true})"
+          apt-cache policy postgresql-client-18 > artifacts/release/pg-client-policy.log
+          sudo apt-get install -y --no-install-recommends postgresql-client-18=18.6-1.pgdg24.04+2
           /usr/lib/postgresql/18/bin/pg_dump --version
           /usr/lib/postgresql/18/bin/pg_restore --version
           /usr/lib/postgresql/18/bin/psql --version
