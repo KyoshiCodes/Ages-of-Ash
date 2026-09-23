@@ -1,6 +1,8 @@
 /** Staging preparation guards: reject unsafe intake and prevent privilege boundary drift. */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import template from "../deploy/staging-intake.template.json";
 import publicTemplate from "../deploy/staging-intake.public.template.json";
@@ -144,21 +146,126 @@ describe("OCI staging preparation", () => {
   });
   it("reports private limits and unverified cost without claiming public readiness", () => {
     const intake = validateIntake(privateFixture()).intake!;
-    const offline = report(intake, [], true);
-    const live = report(intake, [], false);
+    const offline = report({
+      intake,
+      rehearsalMode: intake.rehearsalMode,
+      issues: [],
+      inspection: "offline",
+    });
+    const live = report({
+      intake,
+      rehearsalMode: intake.rehearsalMode,
+      issues: [],
+      inspection: "attempted",
+    });
     for (const evidence of [offline, live]) {
       expect(evidence).toContain("Rehearsal mode: private-no-dns");
-      expect(evidence).toContain("DEFERRED/UNVERIFIED: external DNS, ACME/TLS");
-      expect(evidence).toContain("public WebSocket");
+      expect(evidence).toContain(
+        "DEFERRED/UNVERIFIED: public DNS, public TLS/ACME",
+      );
+      expect(evidence).toContain("internet browser flow");
+      expect(evidence).toContain("public WebSocket validation");
+      expect(evidence).toContain("public alert delivery");
+      expect(evidence).not.toContain(
+        "3. Prepare exact-commit release; approve migrations separately; validate public TLS/gameplay/WebSocket and alerts.",
+      );
       expect(evidence).toContain("Off-host backup is UNVERIFIED");
       expect(evidence).toContain("ZERO PLANNED COST REQUESTED, NOT VERIFIED");
       expect(evidence).not.toContain(intake.tenancyId);
       expect(evidence).not.toContain(intake.compartmentId);
     }
     expect(live).toContain("public DNS deliberately not queried");
-    expect(report(validateIntake(fixture()).intake!, [], false)).toContain(
-      "Public DNS delegation was checked",
+    const publicIntake = validateIntake(fixture()).intake!;
+    const publicEvidence = report({
+      intake: publicIntake,
+      rehearsalMode: publicIntake.rehearsalMode,
+      issues: [],
+      inspection: "attempted",
+    });
+    expect(publicEvidence).toContain("Rehearsal mode: public-dns");
+    expect(publicEvidence).toContain("Public DNS delegation was checked");
+    expect(publicEvidence).toContain(
+      "validate public TLS/gameplay/WebSocket and alerts",
     );
+    expect(publicEvidence).not.toContain("DEFERRED/UNVERIFIED: public DNS");
+  });
+  it("keeps a recognized private mode when other inputs block validation", () => {
+    const incomplete = {
+      ...privateFixture(),
+      ocpus: 1,
+      memoryGb: 6,
+      tenancyId: "<TENANCY_OCID>",
+      compartmentId: "<STAGING_COMPARTMENT_OCID>",
+      productionDenyIds: ["<PRODUCTION_COMPARTMENT_OCID>"],
+      availabilityDomain: "<AVAILABILITY_DOMAIN>",
+      quotaLimitName: "<OCI_COMPUTE_LIMIT_NAME>",
+      network: {
+        ...privateFixture().network,
+        vcnCidr: "<VCN_CIDR>",
+      },
+    };
+    const parsed = validateIntake(incomplete);
+    expect(parsed.intake).toBeUndefined();
+    expect(parsed.rehearsalMode).toBe("private-no-dns");
+    expect(parsed.issues).toHaveLength(6);
+    const evidence = report({
+      intake: parsed.intake,
+      rehearsalMode: parsed.rehearsalMode,
+      issues: parsed.issues,
+      inspection: "offline",
+    });
+    expect(evidence).toContain("Rehearsal mode: private-no-dns");
+    expect(evidence).toContain("Result: BLOCKED");
+    expect(evidence).toContain(
+      "DEFERRED/UNVERIFIED: public DNS, public TLS/ACME",
+    );
+    expect(evidence).toContain("Off-host backup is UNVERIFIED");
+    expect(evidence).toContain("3. Resolve blocked private intake fields");
+    expect(evidence).not.toContain(
+      "validate public TLS/gameplay/WebSocket and alerts",
+    );
+    const emptyDns = validateIntake({
+      ...privateFixture(),
+      hostname: "",
+      zoneName: "",
+    });
+    expect(emptyDns.issues.length).toBeGreaterThan(0);
+    expect(emptyDns.rehearsalMode).toBe("private-no-dns");
+  });
+  it("renders a blocked private report through the offline CLI without cloud calls", () => {
+    const root = join(process.cwd(), ".local", "staging");
+    mkdirSync(root, { recursive: true });
+    const prefix = "mode-report-" + randomUUID();
+    const intakeFile = join(root, prefix + ".json");
+    const reportFile = join(root, prefix + ".md");
+    const raw = { ...privateFixture(), tenancyId: "<TENANCY_OCID>" };
+    writeFileSync(intakeFile, JSON.stringify(raw));
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          "--import",
+          "tsx",
+          "scripts/staging.ts",
+          "plan",
+          "--offline",
+          "--intake=" + intakeFile,
+          "--report=" + reportFile,
+        ],
+        { shell: false, encoding: "utf8", windowsHide: true },
+      );
+      expect(result.status).toBe(1);
+      const evidence = readFileSync(reportFile, "utf8");
+      expect(evidence).toContain("Rehearsal mode: private-no-dns");
+      expect(evidence).toContain("Result: BLOCKED");
+      expect(evidence.match(/^- BLOCKED:/gm)).toHaveLength(1);
+      expect(evidence).not.toContain(
+        "validate public TLS/gameplay/WebSocket and alerts",
+      );
+    } finally {
+      rmSync(intakeFile, { force: true });
+      rmSync(reportFile, { force: true });
+    }
   });
   it("requires unique names, distinct subnets and all per-service environment variable names", () => {
     const base = fixture();

@@ -1,6 +1,12 @@
-# Living state — 2026-09-22
+# Living state — 2026-09-23
 
 Workspace: `C:\Projects\Ages of Ash`; canonical remote: https://github.com/KyoshiCodes/Ages-of-Ash. Prisma CLI, client and adapter remain pinned to **7.10.0**. The playable Ember Ledger expansion remains: timed operations, offline catch-up/report, crew histories, supply graph, faction pressure, Ash Cycle, optional lazy 3D/audio and server-side telemetry.
+
+## Private-no-dns blocked-report correction — 2026-09-23
+
+At baseline 46d28b0, a private intake with unresolved fields stayed BLOCKED, but its report lost a valid rehearsalMode because full schema parsing returned no executable intake. It then printed INVALID/UNRESOLVED and the public TLS/gameplay/WebSocket next step. Validation now carries only a separately checked mode to blocked reports; it still withholds unvalidated targets and skips OCI calls. Private reports mark public DNS, TLS/ACME, internet browser flow, WebSocket validation, alert delivery and off-host backup deferred/unverified. Public mode retains its owned-DNS/TLS route. Duplicate placeholder/schema diagnostics are collapsed without changing validation. The existing ignored private intake remains BLOCKED on six distinct unresolved fields; its report identifies private-no-dns and gives only private guidance. No OCI action was performed.
+
+Native Windows full acceptance passed on disposable PostgreSQL 18.6 with Prisma 7.10.0: 42 unit (13 staging), 6 integration and 5 Playwright E2E tests; backup, empty-target restore, populated-target refusal, typecheck, lint, build and 165.3 KiB gzip initial-JS budget passed. Hosted verification for this repair must match its exact commit before being claimed.
 
 ## Private zero-cost OCI rehearsal mode — planning and validation only
 

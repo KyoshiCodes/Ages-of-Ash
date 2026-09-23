@@ -210,16 +210,27 @@ if (!existsSync(intakeFile))
   throw new Error(
     "Missing local intake. Copy deploy/staging-intake.template.json to .local/staging/intake.json and replace every placeholder.",
   );
-const parsed = validateIntake(
-  JSON.parse(readFileSync(intakeFile, "utf8")) as unknown,
-);
+const raw = JSON.parse(readFileSync(intakeFile, "utf8")) as unknown;
+const parsed = validateIntake(raw);
 const issues = [...parsed.issues];
-if (!offline && parsed.intake && issues.length === 0)
+const inspection = offline
+  ? "offline"
+  : parsed.intake && issues.length === 0
+    ? "attempted"
+    : "blocked";
+if (inspection === "attempted" && parsed.intake)
   issues.push(...(await inspectCloud(parsed.intake)));
 mkdirSync(dirname(reportFile), { recursive: true });
-writeFileSync(reportFile, report(parsed.intake, issues, offline), {
-  mode: 0o600,
-});
+writeFileSync(
+  reportFile,
+  report({
+    intake: parsed.intake,
+    rehearsalMode: parsed.rehearsalMode,
+    issues,
+    inspection,
+  }),
+  { mode: 0o600 },
+);
 console.log(
   "Staging " +
     mode +

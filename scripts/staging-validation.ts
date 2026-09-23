@@ -30,9 +30,12 @@ export const requiredEnvironmentNames = {
 const ocid = z.string().regex(/^ocid1\.[a-z0-9-]+\.[a-z0-9-]+\..+$/);
 const resource = z.string().regex(/^ages-stg-[a-z0-9-]+$/);
 const cidr = z.string().regex(/^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/);
+export const rehearsalModeSchema = z.enum(["private-no-dns", "public-dns"]);
+export type RehearsalMode = z.infer<typeof rehearsalModeSchema>;
+
 export const intakeSchema = z.object({
   environment: z.literal("staging"),
-  rehearsalMode: z.enum(["private-no-dns", "public-dns"]),
+  rehearsalMode: rehearsalModeSchema,
   tenancyId: ocid,
   compartmentId: ocid,
   expectedCompartmentName: z.string().regex(/^ages-staging(?:-[a-z0-9-]+)?$/),
@@ -144,19 +147,22 @@ function inside(child: string, parent: string): boolean {
 }
 export function validateIntake(raw: unknown): {
   intake?: StagingIntake;
+  rehearsalMode?: RehearsalMode;
   issues: string[];
 } {
-  const issues = placeholderPaths(raw).map(
-    (path) => path + ": replace placeholder",
-  );
+  // Preserve only a recognized mode for blocked reports; never expose unvalidated targets.
+  const mode = z.object({ rehearsalMode: rehearsalModeSchema }).safeParse(raw);
+  const rehearsalMode = mode.success ? mode.data.rehearsalMode : undefined;
+  const placeholders = placeholderPaths(raw);
+  const issues = placeholders.map((path) => path + ": replace placeholder");
   const parsed = intakeSchema.safeParse(raw);
   if (!parsed.success) {
-    issues.push(
-      ...parsed.error.issues.map(
-        (issue) => issue.path.join(".") + ": invalid or missing",
-      ),
-    );
-    return { issues: [...new Set(issues)] };
+    for (const issue of parsed.error.issues) {
+      const path = issue.path.join(".");
+      if (!placeholders.includes("intake." + path))
+        issues.push(path + ": invalid or missing");
+    }
+    return { rehearsalMode, issues: [...new Set(issues)] };
   }
   const value = parsed.data;
   if (value.tenancyId === value.compartmentId)
@@ -238,7 +244,11 @@ export function validateIntake(raw: unknown): {
         "environmentFiles." + role + ": invalid environment variable name",
       );
   }
-  return { intake: value, issues: [...new Set(issues)] };
+  return {
+    intake: value,
+    rehearsalMode: value.rehearsalMode,
+    issues: [...new Set(issues)],
+  };
 }
 
 /** Fixed allowlist of read-only OCI CLI operations. Values remain literal arguments. */
