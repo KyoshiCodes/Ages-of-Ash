@@ -40,3 +40,9 @@
 - ADR-038: Native backup/restore drills use an empty `ages_restore_*` target; a populated target is rejected and production restore needs a separate incident decision.
 - ADR-039: `pnpm setup:db` creates/probes the configured role and database only; `db:generate`, `db:deploy`, and `db:seed` are separately explicit developer actions.
 - ADR-040: CI installs the exact PostgreSQL 18.6 PGDG noble client package and requires the native dump/restore drill on every disposable full run; raw dumps stay outside uploaded artifacts.
+
+- ADR-041: OCI staging preparation uses a typed read-only intake/plan with fixed OCI get/list calls; no provisioning engine is added before human network/IAM approval.
+- ADR-042: First rehearsal uses one Caddy public VM with API, worker and PostgreSQL loopback; an empty private subnet is reserved for a measured future split.
+- ADR-043: Staging has distinct Unix API, worker, backup and release identities and root-owned per-service env files; the host provisioner requires explicit staging approval.
+- ADR-044: Off-host dumps use age public-recipient encryption and a backup-only OCI API-key writer; Object Storage read/write never confers private-key decryption.
+- ADR-045: Code deploy, migration, data restore, traffic cutover and public-beta approval are separate gates with named private owners; a green plan is evidence, not authority.

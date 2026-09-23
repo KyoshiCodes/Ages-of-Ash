@@ -12,6 +12,12 @@ const excluded = new Set([
   ".pnpm-store",
   ".generated",
   "artifacts",
+  ".oci",
+  ".terraform",
+  ".tofu",
+  "secrets",
+  "certificates",
+  "cloud-plans",
   ".agents",
   ".codex",
 ]);
@@ -23,6 +29,14 @@ function walk(dir: string): string[] {
     if (
       entry.name === "SOURCEBOOK.md" ||
       entry.name.endsWith(".log") ||
+      /\.(?:pem|key|p12|pfx|crt|csr|cer|p7b|age|agekey|backup|dump)(?:\.partial|\.gz)?$/i.test(
+        entry.name,
+      ) ||
+      /\.(?:tfstate|tfplan|tofuplan)(?:\..+)?$/i.test(entry.name) ||
+      /\.sql\.gz$/i.test(entry.name) ||
+      /\.(?:inventory|plan)\.(?:json|md)$/i.test(entry.name) ||
+      entry.name === "oci_config" ||
+      entry.name === "credentials" ||
       (entry.name.startsWith(".env") && entry.name !== ".env.example")
     )
       return [];

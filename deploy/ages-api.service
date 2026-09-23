@@ -3,10 +3,10 @@
 Description=Ages of Ash API
 After=network-online.target postgresql.service
 [Service]
-User=ages
-Group=ages
+User=ages-api
+Group=ages-api
 WorkingDirectory=/srv/ages/current
-EnvironmentFile=/etc/ages/ages.env
+EnvironmentFile=/etc/ages/api.env
 ExecStart=/usr/bin/node --enable-source-maps dist/api.js
 Restart=always
 RestartSec=3

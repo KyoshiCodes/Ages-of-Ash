@@ -120,3 +120,7 @@ The additive `OperationalStatus` table holds per-job last success/failure, durat
 Analytics is disabled unless `ANALYTICS_ENABLED=true` is deliberately set. The operator query requires `--operator` and emits aggregate cohorts only. Session/telemetry observations retain only action category and timing/counts. A 30-day cleanup command defaults to dry-run and requires an explicit deletion flag; permanent audits and reward receipts are excluded. Backup/restore ownership and non-production verification live in RECOVERY.md. The physical trace protocol is DEVICE_VALIDATION.md.
 
 // TODO(agent): Measure hosted queue retries/lag and database pool saturation; tune readiness/alert thresholds from a real load test.
+
+## OCI staging boundary (preparation only)
+
+The proposed first rehearsal keeps Caddy/static assets public on one approved staging VM while API, worker and PostgreSQL 18 bind to loopback. A separate private subnet is reserved, empty. API, worker, backup and release use distinct Unix users and env files; PostgreSQL roles remain separately scoped. Staging intake, fixed read-only OCI preflight/plan, NSG/security-list/host-firewall intent, DNS/TLS, encrypted off-host backup with independent key custody, and RACI gates are in [OCI_STAGING_ARCHITECTURE.md](OCI_STAGING_ARCHITECTURE.md) and [OCI_STAGING_RUNBOOK.md](OCI_STAGING_RUNBOOK.md). OCI resources and physical performance have not been exercised. No runtime process migrates; release still requires exact SHA and explicit migration approval.

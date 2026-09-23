@@ -9,6 +9,7 @@ import {
   rmSync,
 } from "node:fs";
 const run = (cmd, args) => execFileSync(cmd, args, { stdio: "inherit" });
+process.umask(0o022); // Runtime users must be able to read immutable release files.
 const approved = process.argv.includes("--approve-migrations");
 const commit = process.argv.find((x) => x.startsWith("--commit="))?.slice(9);
 if (!commit || !/^[0-9a-f]{40}$/.test(commit))
@@ -23,7 +24,7 @@ const root = "/srv/ages",
 if (!existsSync(source))
   run("runuser", [
     "-u",
-    "ages",
+    "ages-release",
     "--",
     "git",
     "clone",
@@ -32,7 +33,7 @@ if (!existsSync(source))
   ]);
 run("runuser", [
   "-u",
-  "ages",
+  "ages-release",
   "--",
   "git",
   "-C",
@@ -43,7 +44,7 @@ run("runuser", [
 ]);
 run("runuser", [
   "-u",
-  "ages",
+  "ages-release",
   "--",
   "git",
   "-C",
@@ -54,10 +55,10 @@ run("runuser", [
   "origin/main",
 ]);
 mkdirSync(release);
-run("chown", ["ages:ages", release]);
+run("chown", ["ages-release:ages-release", release]);
 run("runuser", [
   "-u",
-  "ages",
+  "ages-release",
   "--",
   "git",
   "-C",
@@ -79,8 +80,8 @@ const readEnv = (path) =>
         return [line.slice(0, i), line.slice(i + 1)];
       }),
   );
-const env = readEnv("/etc/ages/ages.env");
-const workerEnv = { ...env, ...readEnv("/etc/ages/worker.env") };
+const env = readEnv("/etc/ages/api.env");
+const workerEnv = readEnv("/etc/ages/worker.env");
 const migrationEnv = approved ? readEnv("/etc/ages/migrate.env") : {};
 if (
   approved &&
@@ -92,7 +93,7 @@ for (const args of [
   ["db:generate"],
   ["verify:fast"],
 ])
-  execFileSync("runuser", ["-u", "ages", "--", "pnpm", ...args], {
+  execFileSync("runuser", ["-u", "ages-release", "--", "pnpm", ...args], {
     cwd: release,
     stdio: "inherit",
     env: { ...process.env, ...env },
@@ -105,7 +106,7 @@ if (!approved) {
   );
   process.exit(0);
 }
-execFileSync("runuser", ["-u", "ages", "--", "pnpm", "db:deploy"], {
+execFileSync("runuser", ["-u", "ages-release", "--", "pnpm", "db:deploy"], {
   cwd: release,
   stdio: "inherit",
   env: { ...process.env, ...migrationEnv },
@@ -114,7 +115,7 @@ execFileSync(
   "runuser",
   [
     "-u",
-    "ages",
+    "ages-release",
     "--",
     "pnpm",
     "exec",
@@ -130,14 +131,14 @@ const previous = existsSync(`${root}/current`)
 // A brief maintenance window prevents an older aggregate parser overwriting newly seeded fields.
 if (previous) run("systemctl", ["stop", "ages-api", "ages-worker"]);
 try {
-  execFileSync("runuser", ["-u", "ages", "--", "pnpm", "db:seed"], {
+  execFileSync("runuser", ["-u", "ages-release", "--", "pnpm", "db:seed"], {
     cwd: release,
     stdio: "inherit",
     env: { ...process.env, ...migrationEnv },
   });
   execFileSync(
     "runuser",
-    ["-u", "ages", "--", "pnpm", "queue:prepare", "--approved"],
+    ["-u", "ages-release", "--", "pnpm", "queue:prepare", "--approved"],
     { cwd: release, stdio: "inherit", env: { ...process.env, ...workerEnv } },
   );
 } catch (error) {

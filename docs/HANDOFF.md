@@ -30,3 +30,16 @@ Release foundation follow-up: Claude Code should validate hosted CI and an ARM64
 Claude Code: inspect scripts/verify-full.ts, scripts/postgres-client.ts, scripts/restore-parity.ts, .github/workflows/ci.yml and the matching Release foundation run. Acceptance: PostgreSQL 18.6 clients and service agree; stages 05a/05b/05c actually ran; source and restored schema, migration checksums, canonical catalog, Player state, PlaySession, TelemetryEvent and OperationalStatus match; generated role/database/dump cleanup completed. Verify with pnpm verify:full on Windows and the hosted job log/summary. Grok: adversarially inspect backup-role write denial, runtime-role privilege isolation, populated-target refusal, CI URL guard, secret-free logs and artifact exclusion; add a regression for any bypass. OCI staging recovery, off-host encryption and measured RPO/RTO remain a separate operator-owned task.
 
 Hosted parity evidence: Release foundation run https://github.com/KyoshiCodes/Ages-of-Ash/actions/runs/35798015112 completed successfully with PostgreSQL 18.6 clients, stages 05a/05b/05c, 29 unit, 6 integration and 5 E2E tests. OCI staging restore remains unverified.
+
+## OCI staging preparation handoff — 2026-09-22
+
+This is preparation, not authorization to touch OCI. No named authority or resource exists in Git. The latest hosted baseline is Release foundation run 35798559620 at 47bc4a1; the staging-preparation changes have native Windows full-gate evidence only until their own hosted run.
+
+| Role/task | Goal and files | Acceptance and evidence | Verification |
+| --- | --- | --- | --- |
+| Security/IAM reviewer | `scripts/staging-validation.ts`, `scripts/staging.ts`, `deploy/provision.mjs`, `deploy/ages-*.service`, `docs/OCI_STAGING_ARCHITECTURE.md` | Fixed read-only CLI calls; production IDs/public DB rejected; service env and OCI backup writer/read/decrypt denials recorded in private store | `pnpm test`, `pnpm staging:plan --offline`; operator live preflight |
+| Release/database operators | `deploy/release.mjs`, `deploy/database-grants.sql`, `deploy/README.md`, `docs/OCI_STAGING_RUNBOOK.md` | Exact SHA, separate migration approval, API/worker/grant readiness, no secret logs; migration and rollback compatibility recorded | `pnpm verify:full` locally; operator staging rehearsal |
+| Backup owner/restore executor/key custodian | `deploy/backup.mjs`, `deploy/restore.mjs`, `docs/RECOVERY.md`, `docs/RECOVERY_OWNERSHIP_TEMPLATE.md` | Ciphertext off-host, separate key custody, empty-target restore, populated-target refusal, parity, measured RTO/RPO and approvals | CI parity remains baseline; operator OCI recovery drill |
+| Device/accessibility owner | `docs/DEVICE_VALIDATION.md`, `docs/PERFORMANCE.md` | Real Android/iOS/integrated-GPU traces, 60 Hz pacing, 4 Mbps authenticated shell and accessibility defects | physical protocol, not CI emulation |
+
+Files `docs/STAGING_INTAKE_TEMPLATE.md` and `deploy/staging-intake.template.json` contain placeholders only. Keep completed intake, OCIDs, names, contacts, CLI profiles, keys and evidence outside Git. Use `pnpm staging:preflight` and `pnpm staging:plan` for read-only operator intake; a green result requires human review and never authorizes cloud mutation.

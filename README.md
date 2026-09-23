@@ -40,6 +40,6 @@ Browser React ── REST / WebSocket ── Fastify API
 
 `pnpm verify:fast` (also `pnpm verify`) runs typecheck, lint, unit tests and the production build. `pnpm verify:full` starts an isolated native PostgreSQL 18 database, proves empty-to-migrated-and-seeded setup, repeats migrate/seed, drills backup/restore, and runs the unit, integration, E2E and performance checks. It never migrates the configured persistent DATABASE_URL. See [recovery](docs/RECOVERY.md) and [device validation](docs/DEVICE_VALIDATION.md).
 
-Oracle deployment uses Ubuntu 24.04 ARM64, PostgreSQL, Caddy and two systemd services. See [deployment](deploy/README.md). Read [STATE](docs/STATE.md) for actual verification and release limitations before exposing a server publicly.
+OCI staging preparation uses Ubuntu 24.04 on an approved ARM64 or x86_64 shape, PostgreSQL 18, Caddy and separate API/worker/backup/release identities. Before any cloud action, complete [staging intake](docs/STAGING_INTAKE_TEMPLATE.md), run the read-only `pnpm staging:preflight` and `pnpm staging:plan`, and review the [architecture](docs/OCI_STAGING_ARCHITECTURE.md), [operator runbook](docs/OCI_STAGING_RUNBOOK.md), [ownership template](docs/RECOVERY_OWNERSHIP_TEMPLATE.md) and [deployment assets](deploy/README.md). No OCI deployment is claimed. Read [STATE](docs/STATE.md) for actual verification and release limitations before exposing a server publicly.
 
 Source of truth: https://github.com/KyoshiCodes/Ages-of-Ash. `scripts/bootstrap-repo.ps1` initializes and publishes only when explicitly run.

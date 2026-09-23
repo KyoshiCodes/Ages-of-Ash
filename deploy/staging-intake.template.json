@@ -1,0 +1,72 @@
+{
+  "environment": "staging",
+  "tenancyId": "<TENANCY_OCID>",
+  "compartmentId": "<STAGING_COMPARTMENT_OCID>",
+  "expectedCompartmentName": "ages-staging",
+  "productionDenyIds": ["<PRODUCTION_COMPARTMENT_OCID>"],
+  "region": "<OCI_REGION>",
+  "availabilityDomain": "<AVAILABILITY_DOMAIN>",
+  "shape": "VM.Standard.A1.Flex",
+  "architecture": "arm64",
+  "ocpus": 2,
+  "memoryGb": 12,
+  "bootVolumeGb": 50,
+  "quotaLimitName": "<OCI_COMPUTE_LIMIT_NAME>",
+  "quotaNeeded": 2,
+  "hostname": "staging.<OWNED_DNS_ZONE>",
+  "zoneName": "<OWNED_DNS_ZONE>",
+  "releaseCommit": "<REVIEWED_40_CHARACTER_SHA>",
+  "resourceNames": {
+    "vcn": "ages-stg-vcn",
+    "publicSubnet": "ages-stg-public",
+    "privateSubnet": "ages-stg-private",
+    "proxy": "ages-stg-edge",
+    "app": "ages-stg-app",
+    "database": "ages-stg-db"
+  },
+  "network": {
+    "vcnCidr": "<VCN_CIDR>",
+    "publicSubnetCidr": "<PUBLIC_SUBNET_CIDR>",
+    "privateSubnetCidr": "<PRIVATE_SUBNET_CIDR>",
+    "publicIngressTcp": [80, 443],
+    "apiPublicIp": false,
+    "workerPublicIp": false,
+    "databasePublicIp": false,
+    "postgresPublicIngress": false,
+    "postgresListen": "127.0.0.1",
+    "adminAccess": "oci-bastion"
+  },
+  "environmentFiles": {
+    "api": {
+      "path": "/etc/ages/api.env",
+      "names": [
+        "DATABASE_URL",
+        "APP_ORIGIN",
+        "NODE_ENV",
+        "HOST",
+        "PORT",
+        "OPS_TOKEN",
+        "ANALYTICS_ENABLED"
+      ]
+    },
+    "worker": {
+      "path": "/etc/ages/worker.env",
+      "names": [
+        "DATABASE_URL",
+        "NODE_ENV",
+        "WORKER_PORT",
+        "APP_ORIGIN",
+        "HOST",
+        "OPS_TOKEN"
+      ]
+    },
+    "backup": {
+      "path": "/etc/ages/backup.env",
+      "names": ["DATABASE_URL", "BACKUP_DIR", "PG_BIN"]
+    },
+    "release": {
+      "path": "/etc/ages/migrate.env",
+      "names": ["DATABASE_URL", "NODE_ENV"]
+    }
+  }
+}

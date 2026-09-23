@@ -3,8 +3,8 @@
 Description=Ages of Ash database backup
 [Service]
 Type=oneshot
-User=ages
-Group=ages
+User=ages-backup
+Group=ages-backup
 EnvironmentFile=/etc/ages/backup.env
 WorkingDirectory=/srv/ages/current
 ExecStart=/usr/bin/node deploy/backup.mjs

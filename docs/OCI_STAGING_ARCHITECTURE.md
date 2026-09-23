@@ -1,0 +1,60 @@
+# OCI staging architecture and security gate
+
+Status: **proposed, unprovisioned**. This is a parameterized rehearsal design, not evidence that a tenancy, instance, domain, backup, alert, or person is configured. The checked-in `deploy/provision.mjs`, `deploy/release.mjs` and systemd units now specify separate Unix identities and environment files; these edits are locally checked but have never run on OCI. An operator must review the exact SHA and prove file permissions and service startup on the staging host before proceeding.
+
+## Boundary and inputs
+
+The operator fills `.local/staging/intake.json` from `deploy/staging-intake.template.json` and the two intake/ownership templates. Every angle-bracket token is unresolved by design. The named staging compartment must be separate from production, never the tenancy root. Region, availability domain, tenancy/compartment OCIDs, production-deny OCIDs, exact release SHA, DNS zone, shape/quota limit, VCN CIDRs, owners, and credential delivery are operator inputs and stay outside Git. No real identifier is asserted here.
+
+Recommended first rehearsal: one Ubuntu 24.04 VM on an ARM64 A1 shape within approved quota; Caddy and static Vite assets are the only public surface. API, worker, and PostgreSQL 18 run on the VM over loopback. A VCN has a public subnet for that VM and a private subnet reserved for a future split; no app/database resource gets a public IP. The names `ages-stg-edge` and `ages-stg-app` in the plan are logical service labels on the same VM. The private subnet is intentionally empty at this stage. An x86_64 shape is an alternative only if quota/cost and native-module evidence justify it; record the architecture decision in intake. Check Prisma engine, argon2, Rolldown, esbuild, and Tailwind native binaries on the selected architecture. Keep at least 2 GiB build headroom, measure VM memory, disk IOPS, and CPU, and set patch windows. The VM boot volume is at least 50 GiB; backup data must leave that volume.
+
+```text
+Internet --HTTPS 443--> [Caddy + static build | public-subnet VM]
+                         | reverse_proxy 127.0.0.1:3000
+                         +--> [API: ages-api] --SQL--> [PostgreSQL 18: 127.0.0.1:5432]
+                         +--> [worker: ages-worker] --SQL--> [same PostgreSQL]
+                                            |
+                                         pg-boss
+OCI Bastion (time-limited SSH) --> VM maintenance
+Backup: ages-backup --pg_dump--> local restricted dump --age public recipient-->
+        Object Storage staging bucket [writer cannot decrypt]
+Recovery: distinct reader --> empty recovery host/database; key custodian supplies
+          private key separately; restore executor validates before cutover
+```
+
+The public DNS A record points only to the approved staging edge address. Caddy obtains/renews TLS after DNS and both network gates permit TCP 80/443; public HTTP is for certificate challenge/redirect, gameplay uses HTTPS. Do not publish AAAA until IPv6 is reviewed. `/api/*` and WebSocket use same-origin proxy; `/internal/*` is blocked publicly. API 3000, worker 3001, PostgreSQL 5432, SSH 22, and the metrics token are not public. PostgreSQL `listen_addresses` remains loopback, SCRAM host auth is scoped to local roles, and `pg_hba.conf` grants no world CIDR. Caddy validates its config before reload.
+
+NSG intent: internet ingress 80/443 to edge only; administrative SSH arrives through OCI Bastion with a short allowlist/TTL; no internet ingress for 3000/3001/5432. Security lists must not broaden the NSG boundary; inspect their effective union. Instance host firewall independently admits only 80/443 publicly and Bastion SSH as approved. Confirm OCI VCN security rules **and** host firewall, because either gate can block TLS. Egress is scoped to package updates, GitHub fetch, ACME, OCI Object Storage/service gateway and alert destinations; measure and approve actual CIDRs/endpoints before tightening. Private subnet has no internet route or public IP. The current provisioner edits iptables 80/443; staging requires a separately approved plan for this exact host firewall before running it.
+
+## Release, monitoring, and recovery flows
+
+The release approver chooses a 40-character SHA whose Release foundation job passed. Release operator prepares immutable source/build first. Database operator reviews migration SQL, backup currency and compatibility; a distinct migration approval then permits `prisma migrate deploy`, runtime grants, seed/queue preparation and service switch. Neither runtime process migrates. The checked-in release script and units now use `ages-release`, root-only `migrate.env`, service-specific `api.env`/`worker.env` and `ages-backup`; their actual permission and startup behavior remains an OCI-host verification gate. A code symlink rollback is allowed only while the new schema/data remain compatible; it does not undo schema or player changes. Recovery cutover is a separate decision.
+
+Liveness: `/api/live`. Readiness: `/api/ready` (database, migration, canonical data, worker heartbeat). Worker `/ready` and `/metrics` and API `/internal/metrics` are loopback/operator only. Journal JSON lines omit URLs, tokens, raw personal data and full saves. Stage alerts for two failed readiness probes, stale worker heartbeat, job failure/retry/lag, backup age/checksum/transfer failure, certificate expiry and disk headroom. The alert recipient tests actual delivery and acknowledgement; merely configuring a route is insufficient. Journal access is restricted to the operator group, and retention is bounded. Analytics stays disabled absent a separate privacy decision.
+
+The existing `deploy/backup.mjs` makes a local custom-format dump with a read-only PostgreSQL identity. For off-host rehearsal, the backup owner verifies size/checksum, encrypts with `age` using a public recipient, and uploads only ciphertext to a staging Object Storage bucket through a backup-only OCI API-key profile. The backup-only OCI profile/key is installed under /etc/ages/oci-backup with directory mode 0750 root:ages-backup and files mode 0640 root:ages-backup; the API and worker cannot read it. The writer has no object read or key decrypt authority. The reader can fetch ciphertext but holds no decryption key. The custodian keeps the private key outside the source host/bucket and releases it only to an approved recovery session. Restore occurs on an isolated, empty `ages_restore_*` database; populated-target refusal must be shown. A live/populated restore is prohibited without incident approval. Measure backup timestamp to recovered transaction (RPO) and timed retrieval/decrypt/restore/check/cutover (RTO); no target is yet certified.
+
+## Identity and file matrix
+
+Role IDs below are machine-testable in `tests/staging.test.ts`. People are intentionally unassigned; placeholders and RACI are in `RECOVERY_OWNERSHIP_TEMPLATE.md`.
+
+| Role ID | Purpose and minimum permission | May access | Must not access | Credential delivery; rotation/revocation owner |
+| --- | --- | --- | --- | --- |
+| provisioner | Scoped OCI create/update within staging compartment after approval | staging network/compute/IAM policy inputs | production compartment, backup decrypt key, game DB | short-lived operator CLI profile; security/IAM approver |
+| api | Unix `ages-api`; PostgreSQL `ages_api` DML only | `/etc/ages/api.env` mode 0640 root:ages-api, app DB via loopback | migration DDL, backup env/object, key | root-installed env; database operator |
+| worker | Unix `ages-worker`; PostgreSQL `ages_worker` game DML and pg-boss | `/etc/ages/worker.env` mode 0640 root:ages-worker, queue schema | migration DDL, backup env/object, key | root-installed env; database operator |
+| release | Unix `ages-release` for build, gated migration DB role | `/srv/ages`; root orchestrator reads `migrate.env` mode 0600 root:root and passes it only to the gated migration subprocess | bootstrap DB credentials, backup decrypt key | separate one-use release session; release/database operators |
+| backup | Unix `ages-backup`; `ages_backup` read-only DB | `backup.env` mode 0640 root:ages-backup, local dump, public age recipient | game writes, migration DDL, private age key | root-installed env; backup owner |
+| restore | `ages-restore` on isolated recovery host; scoped restore DB role | empty recovery DB, ciphertext after reader handoff | live populated target, API/worker env | just-in-time recovery session; database operator |
+| objectWriter | backup-only OCI API-key principal scoped to put/list staging backup prefix | encrypted staging objects, Object Storage endpoint | object delete/read unless operationally required, key decrypt | root-installed OCI profile/key readable only by ages-backup; backup owner/IAM approver |
+| objectReader | separate OCI principal scoped to get/list approved recovery prefix | ciphertext retrieval | object write/delete, key decrypt | time-bound operator session; restore executor/IAM approver |
+| keyCustodian | offline/private age identity; decrypt only with approved dual control | private key on recovery workstation/host session | source-host runtime credentials, Object Storage mutation | independent secure key channel; key custodian/security approver |
+| logAlert | read-only metrics/journals and outbound alert route | sanitized health metrics and alert endpoint | player tables, secret env files, backup keys | scoped alert integration credential; alert owner |
+
+Unix groups are separate. `/srv/ages/releases` is writable by `ages-release` and readable by API/worker; runtime users cannot modify source or symlink. `/etc/ages` is root-owned mode 0755 with per-file groups as above; no common readable `ages.env`. `backup.env` and `migrate.env` are never inherited by runtime services. The bootstrap DB administrator credential lives outside service files. Staging operators must verify `namei -l` and `sudo -u <service-user> test -r` positive/negative cases, plus `psql` role grants; see the denied-access checklist.
+
+Denied-access evidence required: API and worker cannot `CREATE TABLE` or read backup env; backup role cannot `INSERT/UPDATE/DELETE`; object writer cannot fetch/decrypt; object reader cannot put/decrypt; service users cannot read `migrate.env` or private key; public network cannot reach 3000/3001/5432; no unauthenticated public metrics; restore script rejects a populated database.
+
+## Preflight limits
+
+`pnpm staging:preflight` and `pnpm staging:plan` use fixed OCI CLI `get`/`list` calls and public NS lookup only. They validate profile tenancy/region, compartment name/state, region subscription, shape listing, a selected compute quota limit, public-zone/delegation, static network/identity names and a production deny list. Shape listing/quota **do not reserve live capacity**. The commands cannot prove DNS control beyond OCI zone access/delegation, local firewall state, actual TLS issuance, or alert/key custody. Those require the operator runbook and sign-off. The plan report stays in ignored `.local/staging` and intentionally omits OCIDs and credentials. No IaC convention exists here; this typed, read-only plan avoids introducing a provisioning engine before identity/network approval.

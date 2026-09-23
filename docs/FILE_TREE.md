@@ -11,6 +11,7 @@ Ages-of-Ash/
   .github/ISSUE_TEMPLATE/agent-task.yml
   .github/ISSUE_TEMPLATE/balance.yml
   .github/ISSUE_TEMPLATE/bug.yml
+  .github/pgdg.sources
   .github/pull_request_template.md
   .github/workflows/ci.yml
   .gitignore
@@ -23,6 +24,7 @@ Ages-of-Ash/
   README.md
   apps/api/package.json
   apps/api/src/index.ts
+  apps/api/src/readiness.ts
   apps/api/src/service.ts
   apps/api/src/telemetry.ts
   apps/web/index.html
@@ -65,30 +67,39 @@ Ages-of-Ash/
   deploy/ages-backup.timer
   deploy/ages-worker.service
   deploy/backup.mjs
+  deploy/database-grants.sql
   deploy/deploy.ps1
   deploy/provision.mjs
   deploy/release.mjs
   deploy/restore.mjs
+  deploy/staging-intake.template.json
   docs/AGENT_GUIDE.md
   docs/ARCHITECTURE.md
   docs/ART_DIRECTION.md
   docs/ART_PROMPTS.md
   docs/DECISIONS.md
+  docs/DEVICE_VALIDATION.md
   docs/FILE_TREE.md
   docs/GAME_DESIGN.md
   docs/HANDOFF.md
+  docs/OCI_STAGING_ARCHITECTURE.md
+  docs/OCI_STAGING_RUNBOOK.md
   docs/PERFORMANCE.md
   docs/PROGRESS.md
   docs/PROMPTS_FOR_REFINEMENT.md
+  docs/RECOVERY.md
+  docs/RECOVERY_OWNERSHIP_TEMPLATE.md
   docs/RETENTION.md
   docs/ROADMAP.md
   docs/SETUP.md
+  docs/STAGING_INTAKE_TEMPLATE.md
   docs/STATE.md
   eslint.config.js
   package.json
   packages/database/package.json
   packages/database/prisma/migrations/20260920000000_initial/migration.sql
   packages/database/prisma/migrations/20260921000000_chronicle/migration.sql
+  packages/database/prisma/migrations/20260922000000_release_foundation/migration.sql
   packages/database/prisma/migrations/migration_lock.toml
   packages/database/prisma/schema.prisma
   packages/database/src/index.ts
@@ -101,38 +112,52 @@ Ages-of-Ash/
   packages/gamedata/package.json
   packages/gamedata/src/balance-schema.ts
   packages/gamedata/src/balance.json
+  packages/gamedata/src/catalog.ts
   packages/gamedata/src/chronicle.json
   packages/gamedata/src/content.json
   packages/gamedata/src/index.ts
   packages/gamedata/src/schema.ts
   packages/infrastructure/package.json
   packages/infrastructure/src/index.ts
+  packages/infrastructure/src/operations.ts
   playwright.config.ts
   pnpm-lock.yaml
   pnpm-workspace.yaml
   prisma.config.ts
   scripts/analytics.ts
+  scripts/apply-runtime-grants.ts
   scripts/bootstrap-repo.ps1
   scripts/build.ts
   scripts/check-performance.ts
   scripts/check-ui.ts
   scripts/commit-message.mjs
+  scripts/database-status.ts
   scripts/doctor.ts
   scripts/generate-audio.ts
   scripts/generate-icons.ts
   scripts/hooks.mjs
   scripts/package-source.ps1
   scripts/performance-budget.ts
+  scripts/postgres-client.ts
   scripts/pre-commit.ps1
+  scripts/prepare-queue.ts
   scripts/process.ts
   scripts/reset-test-limits.ts
+  scripts/restore-parity.ts
+  scripts/retention-cleanup.ts
   scripts/setup-db.ts
   scripts/sourcebook.ts
+  scripts/staging-validation.ts
+  scripts/staging.ts
   scripts/test-native-db.ps1
   scripts/validate-content.ts
+  scripts/verify-full.ts
   tests/e2e/chronicle.spec.ts
   tests/e2e/core.spec.ts
+  tests/e2e/release.spec.ts
   tests/integration.test.ts
+  tests/release.test.ts
+  tests/staging.test.ts
   tests/unit.test.ts
   tsconfig.json
 ```

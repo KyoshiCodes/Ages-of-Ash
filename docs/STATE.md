@@ -2,6 +2,12 @@
 
 Workspace: `C:\Projects\Ages of Ash`; canonical remote: https://github.com/KyoshiCodes/Ages-of-Ash. Prisma CLI, client and adapter remain pinned to **7.10.0**. The playable Ember Ledger expansion remains: timed operations, offline catch-up/report, crew histories, supply graph, faction pressure, Ash Cycle, optional lazy 3D/audio and server-side telemetry.
 
+## OCI staging readiness preparation — local only
+
+From baseline commit 47bc4a1 (hosted Release foundation run 35798559620), the repository now has a typed staging intake, read-only `pnpm staging:preflight` / `pnpm staging:plan`, placeholder/production/network/role guards, a non-secret architecture and RACI, and an operator rehearsal runbook. The host provisioner now requires `--approve-host-provisioning` and creates distinct `ages-release`, `ages-api`, `ages-worker` and `ages-backup` Unix accounts with separate environment files. The exact-commit release still requires `--approve-migrations`. These host changes have **not** run on OCI. No OCI resources, DNS, IAM identities, keys, buckets, firewall rules, application release or recovery cutover were created by this milestone.
+
+Current native Windows `pnpm verify:full` passed on disposable PostgreSQL 18.6: three migrations, repeat migrate/seed, backup, empty-target restore, populated-target refusal, 36 unit tests, 6 integration tests, 5 Playwright E2E tests, production build and 165.3 KiB gzip initial JS. Most recent emulated 4 Mbps/80 ms signed-out shell was ready in 807 ms (first paint 268 ms, FCP 684 ms), with zero initial media requests. `pnpm staging:plan --offline` against the checked-in placeholder template correctly exited 1 and wrote only a sanitized, ignored BLOCKED report; a synthetic completed offline intake exited 0 as STATIC INPUT VALID; OCI UNVERIFIED and its report contained no OCIDs or credentials. OCI CLI is unavailable on this Windows host, so live preflight/plan, host service permissions, TLS/DNS, off-host encryption/object retrieval, alert delivery, measured RTO/RPO, physical Android/iOS/integrated-GPU and accessibility remain unverified. The latest hosted CI evidence is the **preparation baseline** run 35798559620; new changes require their own hosted run if pushed.
+
 ## Release foundation now present
 
 `pnpm setup:db` now only creates/probes the role and database; generation, migration and seed are separate explicit commands. `pnpm run doctor` is read-only by default and checks migration history, canonical content and generated client/schema parity. `--fix` repairs tools/client only; `--fix --database` is the explicit database opt-in. `pnpm verify:fast` is the typecheck/lint/unit/build gate. `pnpm verify:full` creates a unique disposable PostgreSQL 18 database, proves empty schema, generates the Prisma client, deploys three migrations, seeds twice without changing player state, drills a separate read-only backup role and native backup/restore/refusal, runs fast, integration, E2E and performance, and removes only its own role/database/cluster. It never targets the configured persistent DATABASE_URL. Hosted CI uses an ephemeral PostgreSQL 18.6 service and the same full gate. Run 35779531846 for commit 129831d failed at 00-bootstrap-probe, before migrations or tests: the launcher treated the npm_execpath pnpm.cjs ELF shim as a Node script. The repair invokes pnpm as a native executable with shell:false, adds an existing-ELF regression fixture, and updates Node 24 action pins and PostgreSQL health checks. Replacement run 35795756821 for commit 550ae6f passed 27 unit, 6 integration, 5 E2E and the bundle gate, but the hosted Linux path skipped native dump/restore.
@@ -24,9 +30,9 @@ OCI provision/release, TLS and ARM64 binaries, off-host encrypted backups, opera
 
 ## Exact next three actions
 
-1. Provision OCI staging with separate DB identities; execute the explicit migration gate, TLS/network/readiness and a local staging restore rehearsal with named recovery owners.
-2. Copy an encrypted backup off-host with separate key custody, retrieve it into an empty staging database, and record measured restore time and recovery decisions.
-3. Measure physical Windows integrated-graphics and Android traces, accessibility and authenticated 4 Mbps first paint, then resolve recorded issues before public registration.
+1. Operator privately completes staging intake and named primary/alternate ownership; runs live read-only preflight/plan, reviews exact SHA/CI, quota/cost, network and denied-access gates, then seeks distinct provisioning approval.
+2. Approved operator rehearses exact-commit host/release/migration/TLS/gameplay, encrypted off-host backup and empty-target restore, populated-target refusal, alerts and timed RTO/RPO; records private evidence and aborts on any failed gate.
+3. Device owner measures Android, iOS and integrated-GPU Windows traces plus accessibility/authenticated 4 Mbps timing; public-beta authority reviews defects separately from deployment.
 
 The following independent result was supplied before this milestone and remains as historical evidence of the chronology. Its prior gaps are addressed or updated above.
 

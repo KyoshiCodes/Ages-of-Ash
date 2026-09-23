@@ -3,10 +3,9 @@
 Description=Ages of Ash worker
 After=network-online.target postgresql.service
 [Service]
-User=ages
-Group=ages
+User=ages-worker
+Group=ages-worker
 WorkingDirectory=/srv/ages/current
-EnvironmentFile=/etc/ages/ages.env
 EnvironmentFile=/etc/ages/worker.env
 ExecStart=/usr/bin/node --enable-source-maps dist/worker.js
 Restart=always
