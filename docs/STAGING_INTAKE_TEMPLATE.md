@@ -1,31 +1,32 @@
 # Staging intake template — operator copy, do not commit completed form
 
-Copy `deploy/staging-intake.template.json` to `.local/staging/intake.json`. Fill every angle-bracket token from the operator-approved staging inventory. Keep the completed file outside Git. Do not paste CLI profiles, keys, database URLs, bucket OCIDs/names, certificates, tokens or personal names into the repository or a ticket. Record those in the approved operator vault/evidence store.
+The first rehearsal uses explicit `"rehearsalMode": "private-no-dns"`. Copy `deploy/staging-intake.template.json` to ignored `.local/staging/intake.json`. The future public route has a separate `deploy/staging-intake.public.template.json` with `"rehearsalMode": "public-dns"`. A missing mode never selects a default.
 
-| Field | Required operator evidence |
+In private mode, `hostname` and `zoneName` must both be JSON `null`; do not invent a domain or put a sentinel string there. `publicIngressTcp` is `[]`, `edgePublicIp`, `apiPublicIp`, `workerPublicIp`, `databasePublicIp`, and `postgresPublicIngress` are `false`, `postgresListen` is `127.0.0.1`, and `adminAccess` is `oci-bastion`. The `publicSubnet` and `proxy` names are reserved future labels only: they do **not** authorize a public subnet, public IP, listener, security rule, or host firewall opening. No external DNS/ACME/TLS or public browser/WebSocket/alert check is claimed. Public mode requires a real owned zone/hostname and separately reviewed TCP 80/443 ingress; it rejects null/sentinel DNS.
+
+| Input | Private rehearsal evidence required |
 | --- | --- |
-| Tenancy, staging compartment, production deny list | Read-only OCI profile tenancy; dedicated `ages-staging` compartment; at least one production compartment OCID in local deny list. Never use tenancy root. |
-| Region, AD, shape, architecture, OCPU/RAM, disk | Quota/cost approval; A1 ARM64 preferred only if capacity and native packages pass. x86_64 choice needs a recorded reason. |
-| Quota limit name/needed units | Exact compute limit name from OCI console/limits API and units appropriate to chosen shape; shape listing is not allocation guarantee. |
-| VCN/public/private CIDRs | Non-overlapping approved ranges; staging public VM and empty reserved private subnet. |
-| DNS hostname and zone | Delegated, operator-owned public zone; staging subdomain only; no production hostname. |
-| Resource names | `ages-stg-*` labels, unique and absent from production inventory. |
-| Exact release SHA | 40-character reviewed commit with passing Release foundation job. |
-| Environment variable names | API/worker/backup/migration files contain only their required names; values delivered separately by authorized owners. |
-| Named role sign-offs | Complete `RECOVERY_OWNERSHIP_TEMPLATE.md` outside Git with primary/backup contacts, approval and escalation. |
-| Cost/retention | Estimated VM, boot volume, Object Storage, egress, Bastion, DNS, alerts; owner and teardown date. |
-| Alert/backup destinations | Non-secret references in the private evidence store; delivery, encryption recipient and restore ownership verified separately. |
+| Tenancy, staging compartment, production deny list | Read-only OCI profile tenancy; dedicated `ages-staging` compartment; at least one production OCID on the private deny list; never tenancy root. |
+| Region, AD, shape, architecture, OCPU/RAM, disk | Operator checks **home-region Always Free eligibility**, selected shape/size, capacity, quota and boot/volume totals in the current OCI Console. Private static validation caps the proposed A1 Flex ARM64 plan at 2 OCPU/12 GiB and one 50 GiB boot volume; this is still not capacity or price proof. |
+| Network and administration | Proposed private host has **no public IP or internet ingress**. Review VCN/private subnet, NSG/security-list effective union, host firewall default-deny and time-limited OCI Bastion path. No public 80/443 or 22 rule. Resolve package-update egress separately; do not assume a NAT gateway, service gateway or public IP costs $0. |
+| Identity and recovery | Keep distinct release/API/worker/backup env files and DB roles; named primary/alternate owners in `RECOVERY_OWNERSHIP_TEMPLATE.md`; migration and restore approvals remain separate. |
+| Exact commit | Reviewed 40-character SHA with passing Release foundation CI. |
+| Cost gate | Before **any future creation**, operator checks OCI Console **Always Free** label/limits and obtains a **$0 planned estimate** for the complete proposed resource set, including compute, boot/block volume, public IP (none requested), Object Storage, egress, Bastion, logging/alerts, and any networking service. Record date, tenancy home region, shape, storage totals and estimate privately; abort if eligibility/capacity or $0 estimate cannot be confirmed. **No billing guarantee:** OCI terms, capacity and service eligibility can change. |
+| Backup destination | Local dump/empty-target refusal remains testable. **Do not claim off-host backup** until a free/approved remote target, Object Storage eligibility if selected, encryption/key custody, retrieval and empty-target restore are approved and tested. |
 
-Use a local OCI CLI API-key profile with read-only tenancy, compartment, region, shape, quota and DNS-zone permissions. Set `OCI_CLI_PROFILE` and, if needed, `OCI_CLI_CONFIG_FILE` only in the local operator session; never commit the profile. The preflight checks the profile's tenancy/region against intake and issues only fixed read-only CLI calls. Its report is sanitized but still operational evidence; store/retain it under restricted access.
+Use only a local read-only OCI CLI API-key profile with tenancy, compartment, region, shape and quota permissions. Private mode omits DNS-zone and public NS calls; public mode requires them. Put `OCI_CLI_PROFILE` and optional `OCI_CLI_CONFIG_FILE` only in the operator session. Keep completed intake, CLI profile, OCIDs, names, credentials, estimates and reports outside Git and tickets; reports under `.local/staging` are ignored but still restricted evidence.
 
 From native Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force .local/staging
 Copy-Item deploy/staging-intake.template.json .local/staging/intake.json
-# Edit the local file and replace every placeholder.
+# Fill all angle-bracket tokens privately; retain the explicit private-no-dns mode.
+pnpm staging:plan --offline
 pnpm staging:preflight
 pnpm staging:plan
 ```
 
-For schema/placeholder review without contacting OCI: `pnpm staging:plan --offline`. It is expected to exit nonzero until the intake is complete. Both live commands write ignored reports under `.local/staging` and make no cloud changes. A green plan permits a human review; it does not authorize provisioning.
+The offline command checks only static safety; it exits nonzero until placeholders are replaced. Live commands perform only fixed OCI `get`/`list` calls and write sanitized local reports. Their success is **not** a cost guarantee or authorization to provision. For later public staging, start from `deploy/staging-intake.public.template.json` and follow the separate public path in `OCI_STAGING_RUNBOOK.md` after obtaining a real domain and approvals.
+
+Official eligibility references: [OCI Always Free resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) and [OCI Bastion overview](https://docs.oracle.com/en-us/iaas/Content/Bastion/Concepts/bastionoverview.htm). The operator must rely on their tenancy's current Console values at provisioning time.

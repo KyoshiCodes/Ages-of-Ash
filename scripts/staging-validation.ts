@@ -32,12 +32,13 @@ const resource = z.string().regex(/^ages-stg-[a-z0-9-]+$/);
 const cidr = z.string().regex(/^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/);
 export const intakeSchema = z.object({
   environment: z.literal("staging"),
+  rehearsalMode: z.enum(["private-no-dns", "public-dns"]),
   tenancyId: ocid,
   compartmentId: ocid,
   expectedCompartmentName: z.string().regex(/^ages-staging(?:-[a-z0-9-]+)?$/),
   productionDenyIds: z.array(ocid).min(1),
   region: z.string().regex(/^[a-z]+-[a-z]+-\d+$/),
-  availabilityDomain: z.string().min(3),
+  availabilityDomain: z.string().regex(/^[A-Za-z0-9:_-]{3,100}$/),
   shape: z.string().regex(/^VM\.Standard\.[A-Za-z0-9.]+$/),
   architecture: z.enum(["arm64", "x86_64"]),
   ocpus: z.number().positive(),
@@ -45,8 +46,14 @@ export const intakeSchema = z.object({
   bootVolumeGb: z.number().int().min(50),
   quotaLimitName: z.string().regex(/^[a-z0-9-]+$/),
   quotaNeeded: z.number().positive(),
-  hostname: z.string().regex(/^staging\.[a-z0-9.-]+\.[a-z]{2,}$/),
-  zoneName: z.string().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/),
+  hostname: z
+    .string()
+    .regex(/^staging\.[a-z0-9.-]+\.[a-z]{2,}$/)
+    .nullable(),
+  zoneName: z
+    .string()
+    .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/)
+    .nullable(),
   releaseCommit: z.string().regex(/^[a-f0-9]{40}$/),
   resourceNames: z.object({
     vcn: resource,
@@ -61,6 +68,7 @@ export const intakeSchema = z.object({
     publicSubnetCidr: cidr,
     privateSubnetCidr: cidr,
     publicIngressTcp: z.array(z.number().int().min(1).max(65535)),
+    edgePublicIp: z.boolean(),
     apiPublicIp: z.boolean(),
     workerPublicIp: z.boolean(),
     databasePublicIp: z.boolean(),
@@ -160,8 +168,33 @@ export function validateIntake(raw: unknown): {
     issues.push(
       "productionDenyIds: selected tenancy/compartment is prohibited",
     );
-  if (!value.hostname.endsWith("." + value.zoneName))
-    issues.push("hostname: must be within the selected DNS zone");
+  if (value.rehearsalMode === "private-no-dns") {
+    if (value.hostname !== null || value.zoneName !== null)
+      issues.push("private-no-dns: hostname and zoneName must be null");
+    if (value.network.publicIngressTcp.length || value.network.edgePublicIp)
+      issues.push("private-no-dns: no public ingress or edge public IP");
+    if (
+      value.shape !== "VM.Standard.A1.Flex" ||
+      value.architecture !== "arm64" ||
+      value.ocpus > 2 ||
+      value.memoryGb > 12 ||
+      value.bootVolumeGb !== 50
+    )
+      issues.push(
+        "private-no-dns: use an A1 Flex ARM64 plan within 2 OCPU/12 GiB and one 50 GiB boot volume; Console $0 check still required",
+      );
+  } else {
+    if (!value.hostname || !value.zoneName)
+      issues.push("public-dns: owned hostname and zoneName are required");
+    else if (!value.hostname.endsWith("." + value.zoneName))
+      issues.push("hostname: must be within the selected DNS zone");
+    if (
+      !value.network.edgePublicIp ||
+      value.network.publicIngressTcp.length !== 2 ||
+      ![80, 443].every((port) => value.network.publicIngressTcp.includes(port))
+    )
+      issues.push("public-dns: public edge requires TCP 80/443 only");
+  }
   if (
     /(^|[.-])(prod|production|live)([.-]|$)/i.test(
       JSON.stringify({
@@ -186,13 +219,9 @@ export function validateIntake(raw: unknown): {
     value.network.apiPublicIp ||
     value.network.workerPublicIp ||
     value.network.databasePublicIp ||
-    value.network.postgresPublicIngress ||
-    value.network.publicIngressTcp.some((port) => ![80, 443].includes(port)) ||
-    ![80, 443].every((port) => value.network.publicIngressTcp.includes(port))
+    value.network.postgresPublicIngress
   )
-    issues.push(
-      "network: only public TCP 80/443 to Caddy; no public API/worker/PostgreSQL",
-    );
+    issues.push("network: no public API/worker/PostgreSQL");
   const resourceValues = Object.values(value.resourceNames);
   if (new Set(resourceValues).size !== resourceValues.length)
     issues.push("resourceNames: names must be unique");
@@ -258,15 +287,19 @@ export function readOnlyCommands(value: StagingIntake): string[][] {
       value.availabilityDomain,
       ...region,
     ],
-    [
-      "dns",
-      "zone",
-      "get",
-      "--zone-name-or-id",
-      value.zoneName,
-      "--scope",
-      "GLOBAL",
-      ...region,
-    ],
+    ...(value.rehearsalMode === "public-dns" && value.zoneName
+      ? [
+          [
+            "dns",
+            "zone",
+            "get",
+            "--zone-name-or-id",
+            value.zoneName,
+            "--scope",
+            "GLOBAL",
+            ...region,
+          ],
+        ]
+      : []),
   ];
 }

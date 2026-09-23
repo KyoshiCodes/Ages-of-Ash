@@ -72,6 +72,7 @@ Ages-of-Ash/
   deploy/provision.mjs
   deploy/release.mjs
   deploy/restore.mjs
+  deploy/staging-intake.public.template.json
   deploy/staging-intake.template.json
   docs/AGENT_GUIDE.md
   docs/ARCHITECTURE.md
@@ -147,6 +148,7 @@ Ages-of-Ash/
   scripts/retention-cleanup.ts
   scripts/setup-db.ts
   scripts/sourcebook.ts
+  scripts/staging-report.ts
   scripts/staging-validation.ts
   scripts/staging.ts
   scripts/test-native-db.ps1

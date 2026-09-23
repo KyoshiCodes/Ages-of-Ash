@@ -2,13 +2,42 @@
 
 **Unexecuted preparation.** No resource, DNS, IAM, bucket, key, alert or person was created by this milestone. Commands below are for an authorized operator after filling `STAGING_INTAKE_TEMPLATE.md` and `RECOVERY_OWNERSHIP_TEMPLATE.md` privately. Replace all angle-bracket tokens in the operator session, never in Git. Do not record secrets, private keys, database URLs, auth cookies or raw player data in evidence. Read `OCI_STAGING_ARCHITECTURE.md`, `RECOVERY.md` and `deploy/README.md` first. A successful preflight is a technical check, not approval.
 
+## Mode gate — private rehearsal first
+
+The first rehearsal selects explicit private-no-dns in the default intake template. Sections 2–9 below describe the **future public-dns** route and must not be followed for private-no-dns. In particular, deploy/provision.mjs opens host 80/443 and is public-only; never run it on an administration-only private host. No private host provision/deployment procedure is executed or approved by this milestone.
+
+Private operator checklist (read-only planning only):
+
+1. Prerequisites: approved staging compartment, read-only OCI CLI profile, production deny list, home-region/shape/quota inputs, exact CI-green SHA, named recovery owners. Set hostname and zoneName to JSON null, publicIngressTcp to [], edge/api/worker/database public IP and PostgreSQL ingress flags false, postgresListen to 127.0.0.1, adminAccess to oci-bastion. Keep the completed intake outside Git.
+2. Roles/approval: staging operator runs the three commands below; security/IAM and backup owners review. No provisioning authority is conveyed. Capture sanitized reports and OCI CLI version privately.
+3. On native Windows PowerShell, run:
+
+~~~powershell
+New-Item -ItemType Directory -Force .local/staging
+Copy-Item deploy/staging-intake.template.json .local/staging/intake.json
+# Complete only the ignored local file; keep rehearsalMode private-no-dns.
+pnpm staging:plan --offline
+pnpm staging:preflight
+pnpm staging:plan
+~~~
+
+4. Expected: completed intake passes static validation; live read-only OCI tenancy/compartment/region/shape/quota metadata passes. No DNS/zone/NS query is made. Reports say public DNS, ACME/TLS, public browser, public WebSocket, public alert delivery and public-edge behavior are deferred. They do **not** prove a private VM, firewall or free capacity.
+5. Cost approval before **any later resource creation**: operator opens their own OCI Console, checks the current home-region Always Free labels/limits and capacity for the A1 Flex 2 OCPU/12 GiB plan with one 50 GiB boot volume, plus boot/block volume, public IP (none), storage/Object Storage, egress, Bastion, alerts/logs and every networking service; records a **$0 planned estimate** and teardown owner. No billing guarantee. If any item is paid, unclear or unavailable, abort rather than substituting a paid shape, NAT gateway, public IP or bucket.
+6. Future private host/network approval needs a separate reviewed administration-only preparation path, no public IP, no 22/80/443/3000/3001/5432/metrics internet ingress at NSG/security-list **and** host firewall, and time-limited Bastion access. Validate denied access and separate service/DB/env identities. Run no public Caddy listener or DNS/ACME path. Package-update egress must be explicitly reviewed for cost. If a private host is later approved, use Bastion-only local checks and a disposable DB backup/empty-target restore/refusal; do not claim public gameplay or TLS. Off-host backup remains unverified until a free/approved target, encryption, separate key custody and retrieval/restore are selected and tested. Abort on any exposed endpoint, unknown cost, access denial failure or restore refusal failure.
+
+Evidence: intake mode, sanitized reports, Console eligibility/$0 estimate with date and home region, approvals, effective network/host-firewall rules if later provisioned, identity-denial results and recovery checks. Never retain keys, DB URLs, tokens, raw player data or completed private inventory in Git. See STAGING_INTAKE_TEMPLATE.md and RECOVERY.md.
+
+## Future public-dns route (requires owned DNS and separate approval)
+
+The following numbered steps are preserved for a later public staging rehearsal. They are not satisfied by private-no-dns and must not be run by an operator without domain ownership, TLS/network/cost approval and a reviewed public-edge change.
+
 ## 1. Intake and preflight
 
-Prerequisites: read-only OCI CLI API-key profile, staging compartment, production deny inventory, delegated zone, exact CI-green SHA, cost/shape/quota/CIDRs, named owners and alternate contacts. Roles: staging operator prepares; security/IAM, DNS/TLS and release approvers review. Commands on native Windows PowerShell:
+Prerequisites: read-only OCI CLI API-key profile, staging compartment, production deny inventory, exact CI-green SHA, cost/shape/quota/CIDRs, named owners and alternate contacts. Public-dns additionally requires a delegated owned zone. Roles: staging operator prepares; security/IAM, DNS/TLS and release approvers review. Commands on native Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force .local/staging
-Copy-Item deploy/staging-intake.template.json .local/staging/intake.json
+Copy-Item deploy/staging-intake.public.template.json .local/staging/intake.json
 # Complete .local/staging/intake.json privately; set OCI_CLI_PROFILE in this session.
 pnpm staging:preflight
 pnpm staging:plan
@@ -16,7 +45,7 @@ pnpm staging:plan
 
 Expected: reports in ignored `.local/staging` state READY FOR HUMAN REVIEW; selected tenancy/compartment/region, shape/quota, delegated DNS, production deny, network and env-name gates pass. Abort: any BLOCKED check, unknown permission, quota ambiguity, undelegated zone, production identifier or nonempty placeholder. Correct the intake and rerun; do not provision. Evidence: sanitized reports, OCI CLI version, approver sign-off, approved costs/CIDRs and source run ID. Secret warning: OCI profile and completed intake never enter Git or shared logs.
 
-## 2. Reviewed host/network provisioning approval
+## 2. Reviewed public host/network provisioning approval
 
 Prerequisites: step 1 and independent security/network approval, reserved staging address and a reviewed change ticket listing VCN public/empty-private subnet, NSG, security-list union, Bastion SSH scope/TTL, instance shape/boot disk, package sources, and both OCI and host firewall rules. Roles: provisioner executes; security/IAM and staging operator approve; DNS/TLS owner approves address. The checked-in repository has **no OCI provisioning command**. Apply the approved OCI console/IaC change outside this milestone; record generated resource identifiers in the private inventory. Before host preparation, inspect exact-commit `deploy/provision.mjs` and its explicit gate. After a Bastion session reaches the approved Ubuntu 24.04 host:
 
@@ -26,7 +55,7 @@ sudo apt-get install -y nodejs git
 git clone https://github.com/KyoshiCodes/Ages-of-Ash.git /home/ubuntu/ages-bootstrap
 git -C /home/ubuntu/ages-bootstrap checkout --detach <REVIEWED_40_CHARACTER_SHA>
 git -C /home/ubuntu/ages-bootstrap rev-parse HEAD
-sudo node /home/ubuntu/ages-bootstrap/deploy/provision.mjs staging.<OWNED_ZONE> --approve-host-provisioning
+sudo node /home/ubuntu/ages-bootstrap/deploy/provision.mjs staging.<OWNED_ZONE> --public-dns-mode --approve-host-provisioning
 sudo -u ages-release git clone https://github.com/KyoshiCodes/Ages-of-Ash.git /srv/ages/source
 sudo -u ages-release git -C /srv/ages/source checkout --detach <SAME_REVIEWED_SHA>
 sudo systemctl status postgresql
@@ -64,7 +93,7 @@ Prerequisites: step 3, Release foundation success for the exact SHA, reviewed ad
 
 Expected: the wrapper fetches and checks out the same reviewed SHA before it executes `release.mjs`; first command prepares immutable worktree without DB mutation or service switch. Second runs `prisma migrate deploy` as migrator, scoped grants/seed/queue setup, symlink switch and readiness wait. API/worker use their own Unix and DB roles. Abort: SHA mismatch, migration review failure, failed backup, unexpected destructive SQL, readiness failure or worker lag; halt, retain old release, and follow rollback section. Evidence: SHA, CI URL, migration approval, migration names, sanitized release log, `/api/ready` result and backup checksum. Secret warning: release/migration env values are delivered through root-owned files; no URL on argv or in tickets.
 
-## 5. DNS/TLS and core hosted game
+## 5. Public DNS/TLS and core hosted game
 
 Prerequisites: exact release ready, DNS owner approval and both network gates verified. Roles: DNS/TLS owner + staging operator. Windows PowerShell checks:
 

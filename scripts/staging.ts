@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { readOnlyCommands, validateIntake } from "./staging-validation.ts";
+import { report } from "./staging-report.ts";
 import type { StagingIntake } from "./staging-validation.ts";
 
 const mode = process.argv[2];
@@ -130,7 +131,6 @@ export async function inspectCloud(value: StagingIntake): Promise<string[]> {
     const regions = regionsRaw as Record<string, unknown>[];
     const shapes = shapesRaw as Record<string, unknown>[];
     const quota = quotaRaw as Record<string, unknown>;
-    const zone = zoneRaw as Record<string, unknown>;
     if (field(tenancy, "id") !== value.tenancyId)
       issues.push("Tenancy identity mismatch");
     if (
@@ -154,112 +154,49 @@ export async function inspectCloud(value: StagingIntake): Promise<string[]> {
       issues.push(
         "Selected compute quota/availability is insufficient or unavailable",
       );
-    if (
-      field(zone, "name").replace(/\.$/, "") !== value.zoneName ||
-      field(zone, "scope") !== "GLOBAL"
-    )
-      issues.push("Public DNS zone identity/scope mismatch");
-    const ociNameservers = Array.isArray(zone.nameservers)
-      ? zone.nameservers
-          .map((item) =>
-            typeof item === "object" && item !== null
-              ? String((item as Record<string, unknown>).hostname || "")
-              : "",
-          )
-          .filter(Boolean)
-      : [];
-    let delegated: string[];
-    try {
-      delegated = await resolveNs(value.zoneName);
-    } catch {
-      throw new Error("Public DNS delegation lookup failed");
-    }
-    const normalize = (entry: string) => entry.toLowerCase().replace(/\.$/, "");
-    if (
-      !ociNameservers.length ||
-      !delegated.length ||
-      !delegated.every((ns) =>
-        ociNameservers.map(normalize).includes(normalize(ns)),
+    if (value.rehearsalMode === "public-dns") {
+      if (!zoneRaw || !value.zoneName)
+        throw new Error("Public DNS zone response is missing");
+      const zone = zoneRaw as Record<string, unknown>;
+      if (
+        field(zone, "name").replace(/\.$/, "") !== value.zoneName ||
+        field(zone, "scope") !== "GLOBAL"
       )
-    )
-      issues.push("Public DNS delegation does not match OCI zone nameservers");
+        issues.push("Public DNS zone identity/scope mismatch");
+      const ociNameservers = Array.isArray(zone.nameservers)
+        ? zone.nameservers
+            .map((item) =>
+              typeof item === "object" && item !== null
+                ? String((item as Record<string, unknown>).hostname || "")
+                : "",
+            )
+            .filter(Boolean)
+        : [];
+      let delegated: string[];
+      try {
+        delegated = await resolveNs(value.zoneName);
+      } catch {
+        throw new Error("Public DNS delegation lookup failed");
+      }
+      const normalize = (entry: string) =>
+        entry.toLowerCase().replace(/\.$/, "");
+      if (
+        !ociNameservers.length ||
+        !delegated.length ||
+        !delegated.every((ns) =>
+          ociNameservers.map(normalize).includes(normalize(ns)),
+        )
+      )
+        issues.push(
+          "Public DNS delegation does not match OCI zone nameservers",
+        );
+    }
   } catch (error) {
     issues.push(
       error instanceof Error ? error.message : "OCI read-only preflight failed",
     );
   }
   return issues;
-}
-function report(
-  value: StagingIntake | undefined,
-  issues: string[],
-  wasOffline: boolean,
-): string {
-  const lines = [
-    "# OCI staging readiness evidence",
-    "",
-    "Generated at: " + new Date().toISOString(),
-    "Mode: " +
-      (wasOffline
-        ? "offline static validation; OCI not queried"
-        : "read-only OCI metadata and DNS inspection"),
-    "Result: " +
-      (issues.length
-        ? "BLOCKED"
-        : wasOffline
-          ? "STATIC INPUT VALID; OCI UNVERIFIED"
-          : "READY FOR HUMAN REVIEW; NO RESOURCES CHANGED"),
-    "",
-    "## Checks",
-    ...(issues.length
-      ? issues.map((issue) => "- BLOCKED: " + issue)
-      : wasOffline
-        ? [
-            "- Static intake passed; OCI CLI, quota, shape and DNS ownership were not checked.",
-          ]
-        : [
-            "- Static intake, production-deny, network, CLI profile, tenancy, compartment, region, shape, quota and delegated zone checks passed.",
-          ]),
-    "",
-    "## Proposed targets and sequence",
-  ];
-  if (value)
-    lines.push(
-      "- Compartment label: " +
-        value.expectedCompartmentName +
-        " (OCID intentionally omitted)",
-      "- Region/AD: " + value.region + " / " + value.availabilityDomain,
-      "- Shape: " +
-        value.shape +
-        " / " +
-        value.architecture +
-        " / " +
-        value.ocpus +
-        " OCPU / " +
-        value.memoryGb +
-        " GiB",
-      "- Boot disk: " +
-        value.bootVolumeGb +
-        " GiB; quota requested: " +
-        value.quotaNeeded +
-        " " +
-        value.quotaLimitName,
-      "- Hostname/zone: " + value.hostname + " / " + value.zoneName,
-      "- Resource labels: " + Object.values(value.resourceNames).join(", "),
-      "- Network: public Caddy TCP 80/443 only; API, worker and PostgreSQL private; PostgreSQL loopback.",
-      "- Reviewed exact commit: " + value.releaseCommit,
-    );
-  lines.push(
-    "",
-    "1. Obtain named sign-offs and verify the checked-in separate-Unix-identity units/release path on the chosen host; no host preparation has been executed.",
-    "2. Operator reviews approved network, quota, DNS, costs and security gates before any provisioning.",
-    "3. Prepare exact-commit release; approve additive migrations separately; validate TLS/gameplay/WebSocket and alerts.",
-    "4. Encrypt and copy a disposable staging backup off-host with separate key custody; restore only to an empty recovery target; measure RTO/RPO.",
-    "5. Record cutover decision separately from deployment; review cost control or teardown.",
-    "",
-    "No OCI create/update/delete command was run. No secret, OCID, key, or database URL is included in this report.",
-  );
-  return lines.join("\n") + "\n";
 }
 if (mode !== "preflight" && mode !== "plan")
   throw new Error(

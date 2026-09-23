@@ -22,10 +22,11 @@ const domain = process.argv[2];
 if (
   !domain ||
   !/^staging\.[a-z0-9.-]+\.[a-z]{2,}$/.test(domain) ||
-  !process.argv.includes("--approve-host-provisioning")
+  !process.argv.includes("--approve-host-provisioning") ||
+  !process.argv.includes("--public-dns-mode")
 )
   throw new Error(
-    "Usage: sudo node deploy/provision.mjs staging.example.com --approve-host-provisioning (requires separate reviewed OCI/network approval)",
+    "Public-DNS host provisioner only: sudo node deploy/provision.mjs staging.example.com --public-dns-mode --approve-host-provisioning (never use for private-no-dns; requires separate reviewed OCI/network approval)",
   );
 console.log(
   "Approved host provisioning target: " +

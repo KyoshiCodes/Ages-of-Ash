@@ -13,8 +13,8 @@
   "bootVolumeGb": 50,
   "quotaLimitName": "<OCI_COMPUTE_LIMIT_NAME>",
   "quotaNeeded": 2,
-  "hostname": null,
-  "zoneName": null,
+  "hostname": "staging.<OWNED_DNS_ZONE>",
+  "zoneName": "<OWNED_DNS_ZONE>",
   "releaseCommit": "<REVIEWED_40_CHARACTER_SHA>",
   "resourceNames": {
     "vcn": "ages-stg-vcn",
@@ -28,14 +28,14 @@
     "vcnCidr": "<VCN_CIDR>",
     "publicSubnetCidr": "<PUBLIC_SUBNET_CIDR>",
     "privateSubnetCidr": "<PRIVATE_SUBNET_CIDR>",
-    "publicIngressTcp": [],
+    "publicIngressTcp": [80, 443],
     "apiPublicIp": false,
     "workerPublicIp": false,
     "databasePublicIp": false,
     "postgresPublicIngress": false,
     "postgresListen": "127.0.0.1",
     "adminAccess": "oci-bastion",
-    "edgePublicIp": false
+    "edgePublicIp": true
   },
   "environmentFiles": {
     "api": {
@@ -70,5 +70,5 @@
       "names": ["DATABASE_URL", "NODE_ENV"]
     }
   },
-  "rehearsalMode": "private-no-dns"
+  "rehearsalMode": "public-dns"
 }

@@ -33,7 +33,7 @@ Hosted parity evidence: Release foundation run https://github.com/KyoshiCodes/Ag
 
 ## OCI staging preparation handoff — 2026-09-22
 
-This is preparation, not authorization to touch OCI. No named authority or resource exists in Git. The latest hosted baseline is Release foundation run 35798559620 at 47bc4a1; the staging-preparation changes have native Windows full-gate evidence only until their own hosted run.
+This is preparation, not authorization to touch OCI. No named authority or resource exists in Git. The staging-preparation baseline 095e58e passed hosted Release foundation run 35813584157 with 36 unit, 6 integration and 5 E2E tests plus backup/restore parity; require a matching hosted run for the exact private-mode SHA before any external rehearsal.
 
 | Role/task | Goal and files | Acceptance and evidence | Verification |
 | --- | --- | --- | --- |
@@ -43,3 +43,7 @@ This is preparation, not authorization to touch OCI. No named authority or resou
 | Device/accessibility owner | `docs/DEVICE_VALIDATION.md`, `docs/PERFORMANCE.md` | Real Android/iOS/integrated-GPU traces, 60 Hz pacing, 4 Mbps authenticated shell and accessibility defects | physical protocol, not CI emulation |
 
 Files `docs/STAGING_INTAKE_TEMPLATE.md` and `deploy/staging-intake.template.json` contain placeholders only. Keep completed intake, OCIDs, names, contacts, CLI profiles, keys and evidence outside Git. Use `pnpm staging:preflight` and `pnpm staging:plan` for read-only operator intake; a green result requires human review and never authorizes cloud mutation.
+
+## Private-no-dns planning handoff — 2026-09-23
+
+The first operator intake now uses the default private template with explicit rehearsalMode private-no-dns, null hostname/zoneName, no public IP/ingress and Bastion administration. Future public staging uses a separate public-dns template, owned DNS and TCP 80/443 review. The read-only plan checks tenancy/compartment/shape/quota but skips DNS in private mode; neither path provisions or verifies cost. Review scripts/staging-validation.ts, scripts/staging.ts, scripts/staging-report.ts, deploy/staging-intake*.json and tests/staging.test.ts. Verify with pnpm staging:plan --offline, pnpm verify:full and the matching hosted run. Do not run deploy/provision.mjs for private mode: its public-dns gate and 80/443 host rules require a different, later approval. Security/IAM and backup owners must privately review the $0 Console estimate, administration-only network and off-host target/key custody before any OCI action. Public TLS, hosted browser/WebSocket, alert delivery, actual cost and off-host recovery remain unverified.

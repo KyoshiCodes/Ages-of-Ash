@@ -46,3 +46,4 @@
 - ADR-043: Staging has distinct Unix API, worker, backup and release identities and root-owned per-service env files; the host provisioner requires explicit staging approval.
 - ADR-044: Off-host dumps use age public-recipient encryption and a backup-only OCI API-key writer; Object Storage read/write never confers private-key decryption.
 - ADR-045: Code deploy, migration, data restore, traffic cutover and public-beta approval are separate gates with named private owners; a green plan is evidence, not authority.
+- ADR-046: Make private-no-dns the explicit first staging intake mode with null DNS and zero public ingress; preserve public-dns as a separately approved future route, and treat $0 as an operator Console gate rather than a billing guarantee.
