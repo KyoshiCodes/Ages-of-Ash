@@ -2,6 +2,10 @@
 
 Workspace: `C:\Projects\Ages of Ash`; canonical remote: https://github.com/KyoshiCodes/Ages-of-Ash. Prisma CLI, client and adapter remain pinned to **7.10.0**. The playable Ember Ledger expansion remains: timed operations, offline catch-up/report, crew histories, supply graph, faction pressure, Ash Cycle, optional lazy 3D/audio and server-side telemetry.
 
+## Local staging-report label clarification — 2026-09-23
+
+The private-no-dns report now displays the planned 1 OCPU / 6 GiB A1 VM and 50 GiB boot disk separately from the required available A1 core quota threshold of 2. It labels releaseCommit as a reviewed/pinned release baseline, which may differ from the checkout generating the report. No quota comparison, TENANCY_ROOT guard, private exposure rule, OCI call path, or deployment behavior changed. A temporary ignored-intake copy rendered offline with no OCIDs; it and its report were removed. Native Windows pnpm verify:full passed 44 unit (15 staging), 6 integration and 5 E2E tests, backup/restore/refusal, typecheck, lint, build and 165.3 KiB gzip initial JS. No live OCI preflight or cloud action ran for this clarity fix.
+
 ## Explicit tenancy-root deny for staging — 2026-09-23
 
 The first private staging intake now supports literal TENANCY_ROOT in productionDenyIds. Validation requires that sentinel, resolves it only from the existing tenancyId in memory, rejects tenancy-root and separately deny-listed production targets, and rejects production/root workload tokens in staging resource targets. Live read-only OCI inspection requires the selected ages-staging compartment to be a direct child of the tenancy root. Both private and public templates use the sentinel; extra dedicated production-compartment OCIDs remain supported only in ignored operator intake. Reports name the convention without printing OCIDs. No provisioning, host, release, recovery or other OCI action was performed.

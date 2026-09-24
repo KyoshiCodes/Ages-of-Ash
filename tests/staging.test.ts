@@ -24,7 +24,7 @@ function fixture() {
     productionDenyIds: [TENANCY_ROOT_DENY, "ocid1.compartment.oc1..production"],
     region: "us-ashburn-1",
     availabilityDomain: "AD-1",
-    quotaLimitName: "standard-a1-core-count",
+    quotaLimitName: "standard-a1-core-regional-count",
     hostname: "staging.example.test",
     zoneName: "example.test",
     releaseCommit: "a".repeat(40),
@@ -41,6 +41,9 @@ function privateFixture() {
   return {
     ...base,
     rehearsalMode: "private-no-dns",
+    ocpus: 1,
+    memoryGb: 6,
+    quotaNeeded: 2,
     hostname: null,
     zoneName: null,
     network: {
@@ -237,6 +240,18 @@ describe("OCI staging preparation", () => {
     for (const evidence of [offline, live]) {
       expect(evidence).toContain("Rehearsal mode: private-no-dns");
       expect(evidence).toContain(
+        "- Shape: VM.Standard.A1.Flex / arm64 / 1 OCPU / 6 GiB",
+      );
+      expect(evidence).toContain("- Boot disk: 50 GiB");
+      expect(evidence).toContain(
+        "- Required available A1 core quota: 2 standard-a1-core-regional-count",
+      );
+      expect(evidence).toContain(
+        "- Reviewed/pinned release baseline: " + intake.releaseCommit,
+      );
+      expect(evidence).not.toContain("quota requested:");
+      expect(evidence).not.toContain("Reviewed exact commit:");
+      expect(evidence).toContain(
         "DEFERRED/UNVERIFIED: public DNS, public TLS/ACME",
       );
       expect(evidence).toContain("internet browser flow");
@@ -261,6 +276,12 @@ describe("OCI staging preparation", () => {
       inspection: "attempted",
     });
     expect(publicEvidence).toContain("Rehearsal mode: public-dns");
+    expect(publicEvidence).toContain(
+      "- Required available A1 core quota: 2 standard-a1-core-regional-count",
+    );
+    expect(publicEvidence).toContain(
+      "- Reviewed/pinned release baseline: " + publicIntake.releaseCommit,
+    );
     expect(publicEvidence).toContain("Deny boundary: TENANCY_ROOT");
     expect(publicEvidence).not.toContain(publicIntake.tenancyId);
     expect(publicEvidence).not.toContain(publicIntake.compartmentId);
@@ -270,6 +291,19 @@ describe("OCI staging preparation", () => {
       "validate public TLS/gameplay/WebSocket and alerts",
     );
     expect(publicEvidence).not.toContain("DEFERRED/UNVERIFIED: public DNS");
+    const nonA1 = validateIntake({
+      ...fixture(),
+      shape: "VM.Standard.E5.Flex",
+      architecture: "x86_64",
+      quotaLimitName: "standard-e5-core-count",
+    }).intake!;
+    expect(
+      report({
+        intake: nonA1,
+        issues: [],
+        inspection: "offline",
+      }),
+    ).toContain("- Required available compute quota: 2 standard-e5-core-count");
   });
   it("keeps a recognized private mode when other inputs block validation", () => {
     const incomplete = {

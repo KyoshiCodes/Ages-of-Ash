@@ -72,14 +72,15 @@ export function report({
         " OCPU / " +
         intake.memoryGb +
         " GiB",
-      "- Boot disk: " +
-        intake.bootVolumeGb +
-        " GiB; quota requested: " +
+      "- Boot disk: " + intake.bootVolumeGb + " GiB",
+      "- Required available " +
+        (intake.shape.includes(".A1.") ? "A1 core" : "compute") +
+        " quota: " +
         intake.quotaNeeded +
         " " +
         intake.quotaLimitName,
       "- Resource labels: " + Object.values(intake.resourceNames).join(", "),
-      "- Reviewed exact commit: " + intake.releaseCommit,
+      "- Reviewed/pinned release baseline: " + intake.releaseCommit,
     );
   }
   if (intake?.productionDenyIds.includes(TENANCY_ROOT_DENY))
