@@ -6,6 +6,8 @@
 
 The first rehearsal selects explicit private-no-dns in the default intake template. Sections 2–9 below describe the **future public-dns** route and must not be followed for private-no-dns. In particular, deploy/provision.mjs opens host 80/443 and is public-only; never run it on an administration-only private host. No private host provision/deployment procedure is executed or approved by this milestone.
 
+Root boundary for both modes: keep literal TENANCY_ROOT in productionDenyIds. It resolves from the existing tenancyId locally; never paste the root OCID into Git or substitute it for the sentinel. The selected ages-staging compartment must be a direct child of root, with no action targeting root, the existing root workload, or a separate deny-listed production compartment. Add any dedicated production compartment OCIDs only to the ignored local intake. A read-only READY report never authorizes a later command. Before provisioning, host preparation, deployment or recovery, the operator must compare that command's target against the approved child and the deny boundary, and enforce compartment-scoped IAM independently; abort on any root target.
+
 Private operator checklist (read-only planning only):
 
 1. Prerequisites: approved staging compartment, read-only OCI CLI profile, production deny list, home-region/shape/quota inputs, exact CI-green SHA, named recovery owners. Set hostname and zoneName to JSON null, publicIngressTcp to [], edge/api/worker/database public IP and PostgreSQL ingress flags false, postgresListen to 127.0.0.1, adminAccess to oci-bastion. Keep the completed intake outside Git.

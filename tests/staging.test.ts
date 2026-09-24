@@ -11,6 +11,8 @@ import {
   placeholderPaths,
   readOnlyCommands,
   requiredRoles,
+  TENANCY_ROOT_DENY,
+  validateCompartmentMetadata,
   validateIntake,
 } from "../scripts/staging-validation.ts";
 
@@ -19,7 +21,7 @@ function fixture() {
     ...structuredClone(publicTemplate),
     tenancyId: "ocid1.tenancy.oc1..stagingtenancy",
     compartmentId: "ocid1.compartment.oc1..stagingcompartment",
-    productionDenyIds: ["ocid1.compartment.oc1..production"],
+    productionDenyIds: [TENANCY_ROOT_DENY, "ocid1.compartment.oc1..production"],
     region: "us-ashburn-1",
     availabilityDomain: "AD-1",
     quotaLimitName: "standard-a1-core-count",
@@ -60,10 +62,84 @@ describe("OCI staging preparation", () => {
   it("accepts a complete isolated staging intake", () => {
     expect(validateIntake(fixture()).issues).toEqual([]);
   });
+  it("resolves TENANCY_ROOT locally and keeps dedicated production compartments denied", () => {
+    for (const base of [privateFixture(), fixture()]) {
+      const rootOnly = { ...base, productionDenyIds: [TENANCY_ROOT_DENY] };
+      expect(validateIntake(rootOnly).issues).toEqual([]);
+      expect(validateIntake(base).issues).toEqual([]);
+      const selectedRoot = validateIntake({
+        ...rootOnly,
+        compartmentId: rootOnly.tenancyId,
+      });
+      expect(selectedRoot.issues).toContain(
+        "compartmentId: root tenancy is not staging isolation",
+      );
+      expect(selectedRoot.issues).toContain(
+        "productionDenyIds: selected tenancy/compartment is prohibited",
+      );
+      expect(
+        validateIntake({
+          ...base,
+          compartmentId: base.productionDenyIds[1],
+        }).issues,
+      ).toContain(
+        "productionDenyIds: selected tenancy/compartment is prohibited",
+      );
+      expect(
+        validateIntake({
+          ...base,
+          productionDenyIds: [base.productionDenyIds[1]],
+        }).issues,
+      ).toContain("productionDenyIds: TENANCY_ROOT is required");
+      expect(
+        validateIntake({
+          ...base,
+          productionDenyIds: [base.tenancyId],
+        }).issues,
+      ).toContain("productionDenyIds: use TENANCY_ROOT instead of a root OCID");
+      expect(
+        validateIntake({
+          ...base,
+          productionDenyIds: ["ROOT", base.productionDenyIds[1]],
+        }).intake,
+      ).toBeUndefined();
+      for (const app of ["ages-stg-root-app", "ages-stg-second-crown-app"]) {
+        expect(
+          validateIntake({
+            ...base,
+            resourceNames: { ...base.resourceNames, app },
+          }).issues,
+        ).toContain(
+          "resource names: production/live/root tokens are prohibited",
+        );
+      }
+    }
+  });
+  it("checks the live compartment metadata is a direct child of tenancy root", () => {
+    const intake = validateIntake(privateFixture()).intake!;
+    const child = {
+      id: intake.compartmentId,
+      name: "ages-staging",
+      "compartment-id": intake.tenancyId,
+      "lifecycle-state": "ACTIVE",
+    };
+    expect(validateCompartmentMetadata(child, intake)).toEqual([]);
+    expect(
+      validateCompartmentMetadata(
+        { ...child, "compartment-id": "ocid1.compartment.oc1..other" },
+        intake,
+      ),
+    ).toContain(
+      "Staging compartment must be a direct child of the selected tenancy root",
+    );
+    expect(
+      validateCompartmentMetadata({ ...child, id: intake.tenancyId }, intake),
+    ).toContain("Compartment identity/name/state mismatch");
+  });
   it("rejects production identifiers, root tenancy and unsafe public network", () => {
     const base = fixture();
     expect(
-      validateIntake({ ...base, compartmentId: base.productionDenyIds[0] })
+      validateIntake({ ...base, compartmentId: base.productionDenyIds[1] })
         .issues,
     ).toContain(
       "productionDenyIds: selected tenancy/compartment is prohibited",
@@ -110,7 +186,7 @@ describe("OCI staging preparation", () => {
       { ...base, hostname: "staging.example.test" },
       { ...base, zoneName: "example.test" },
       { ...base, region: "<OCI_REGION>" },
-      { ...base, compartmentId: base.productionDenyIds[0] },
+      { ...base, compartmentId: base.productionDenyIds[1] },
       {
         ...base,
         resourceNames: { ...base.resourceNames, app: "ages-stg-prod-app" },
@@ -171,8 +247,10 @@ describe("OCI staging preparation", () => {
       );
       expect(evidence).toContain("Off-host backup is UNVERIFIED");
       expect(evidence).toContain("ZERO PLANNED COST REQUESTED, NOT VERIFIED");
+      expect(evidence).toContain("Deny boundary: TENANCY_ROOT");
       expect(evidence).not.toContain(intake.tenancyId);
       expect(evidence).not.toContain(intake.compartmentId);
+      expect(evidence).not.toContain(intake.productionDenyIds[1]);
     }
     expect(live).toContain("public DNS deliberately not queried");
     const publicIntake = validateIntake(fixture()).intake!;
@@ -183,6 +261,10 @@ describe("OCI staging preparation", () => {
       inspection: "attempted",
     });
     expect(publicEvidence).toContain("Rehearsal mode: public-dns");
+    expect(publicEvidence).toContain("Deny boundary: TENANCY_ROOT");
+    expect(publicEvidence).not.toContain(publicIntake.tenancyId);
+    expect(publicEvidence).not.toContain(publicIntake.compartmentId);
+    expect(publicEvidence).not.toContain(publicIntake.productionDenyIds[1]);
     expect(publicEvidence).toContain("Public DNS delegation was checked");
     expect(publicEvidence).toContain(
       "validate public TLS/gameplay/WebSocket and alerts",
@@ -196,7 +278,7 @@ describe("OCI staging preparation", () => {
       memoryGb: 6,
       tenancyId: "<TENANCY_OCID>",
       compartmentId: "<STAGING_COMPARTMENT_OCID>",
-      productionDenyIds: ["<PRODUCTION_COMPARTMENT_OCID>"],
+      productionDenyIds: [TENANCY_ROOT_DENY, "<PRODUCTION_COMPARTMENT_OCID>"],
       availabilityDomain: "<AVAILABILITY_DOMAIN>",
       quotaLimitName: "<OCI_COMPUTE_LIMIT_NAME>",
       network: {

@@ -30,6 +30,7 @@ export const requiredEnvironmentNames = {
 const ocid = z.string().regex(/^ocid1\.[a-z0-9-]+\.[a-z0-9-]+\..+$/);
 const resource = z.string().regex(/^ages-stg-[a-z0-9-]+$/);
 const cidr = z.string().regex(/^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/);
+export const TENANCY_ROOT_DENY = "TENANCY_ROOT";
 export const rehearsalModeSchema = z.enum(["private-no-dns", "public-dns"]);
 export type RehearsalMode = z.infer<typeof rehearsalModeSchema>;
 
@@ -39,7 +40,9 @@ export const intakeSchema = z.object({
   tenancyId: ocid,
   compartmentId: ocid,
   expectedCompartmentName: z.string().regex(/^ages-staging(?:-[a-z0-9-]+)?$/),
-  productionDenyIds: z.array(ocid).min(1),
+  productionDenyIds: z
+    .array(z.union([ocid, z.literal(TENANCY_ROOT_DENY)]))
+    .min(1),
   region: z.string().regex(/^[a-z]+-[a-z]+-\d+$/),
   availabilityDomain: z.string().regex(/^[A-Za-z0-9:_-]{3,100}$/),
   shape: z.string().regex(/^VM\.Standard\.[A-Za-z0-9.]+$/),
@@ -165,12 +168,17 @@ export function validateIntake(raw: unknown): {
     return { rehearsalMode, issues: [...new Set(issues)] };
   }
   const value = parsed.data;
+  // Resolve the root sentinel in memory only; reports never receive the expanded deny list.
+  const deniedTargets = value.productionDenyIds.map((entry) =>
+    entry === TENANCY_ROOT_DENY ? value.tenancyId : entry,
+  );
+  if (!value.productionDenyIds.includes(TENANCY_ROOT_DENY))
+    issues.push("productionDenyIds: TENANCY_ROOT is required");
+  if (value.productionDenyIds.includes(value.tenancyId))
+    issues.push("productionDenyIds: use TENANCY_ROOT instead of a root OCID");
   if (value.tenancyId === value.compartmentId)
     issues.push("compartmentId: root tenancy is not staging isolation");
-  if (
-    value.productionDenyIds.includes(value.tenancyId) ||
-    value.productionDenyIds.includes(value.compartmentId)
-  )
+  if (deniedTargets.includes(value.compartmentId))
     issues.push(
       "productionDenyIds: selected tenancy/compartment is prohibited",
     );
@@ -201,16 +209,20 @@ export function validateIntake(raw: unknown): {
     )
       issues.push("public-dns: public edge requires TCP 80/443 only");
   }
+  const resourceTargets = JSON.stringify({
+    names: value.resourceNames,
+    hostname: value.hostname,
+    zone: value.zoneName,
+    compartment: value.expectedCompartmentName,
+  });
   if (
-    /(^|[.-])(prod|production|live)([.-]|$)/i.test(
-      JSON.stringify({
-        names: value.resourceNames,
-        hostname: value.hostname,
-        compartment: value.expectedCompartmentName,
-      }),
+    /(^|[.-])(prod|production|live|root|second[-.]?crown)([.-]|$)/i.test(
+      resourceTargets,
     )
   )
-    issues.push("resource names: production/live tokens are prohibited");
+    issues.push("resource names: production/live/root tokens are prohibited");
+  if (deniedTargets.some((target) => resourceTargets.includes(target)))
+    issues.push("resource names: denied boundary identifier is prohibited");
   if (value.architecture === "arm64" && !value.shape.includes(".A1."))
     issues.push("shape: ARM64 requires a reviewed A1 shape");
   if (value.architecture === "x86_64" && value.shape.includes(".A1."))
@@ -249,6 +261,25 @@ export function validateIntake(raw: unknown): {
     rehearsalMode: value.rehearsalMode,
     issues: [...new Set(issues)],
   };
+}
+
+/** Read-only metadata guard: the reviewed staging compartment must be a direct root child. */
+export function validateCompartmentMetadata(
+  record: Record<string, unknown>,
+  value: StagingIntake,
+): string[] {
+  const issues: string[] = [];
+  if (
+    record.id !== value.compartmentId ||
+    record.name !== value.expectedCompartmentName ||
+    record["lifecycle-state"] !== "ACTIVE"
+  )
+    issues.push("Compartment identity/name/state mismatch");
+  if (record["compartment-id"] !== value.tenancyId)
+    issues.push(
+      "Staging compartment must be a direct child of the selected tenancy root",
+    );
+  return issues;
 }
 
 /** Fixed allowlist of read-only OCI CLI operations. Values remain literal arguments. */

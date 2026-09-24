@@ -3,7 +3,7 @@
   "tenancyId": "<TENANCY_OCID>",
   "compartmentId": "<STAGING_COMPARTMENT_OCID>",
   "expectedCompartmentName": "ages-staging",
-  "productionDenyIds": ["<PRODUCTION_COMPARTMENT_OCID>"],
+  "productionDenyIds": ["TENANCY_ROOT"],
   "region": "<OCI_REGION>",
   "availabilityDomain": "<AVAILABILITY_DOMAIN>",
   "shape": "VM.Standard.A1.Flex",

@@ -4,7 +4,11 @@ import { resolveNs } from "node:dns/promises";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { readOnlyCommands, validateIntake } from "./staging-validation.ts";
+import {
+  readOnlyCommands,
+  validateCompartmentMetadata,
+  validateIntake,
+} from "./staging-validation.ts";
 import { report } from "./staging-report.ts";
 import type { StagingIntake } from "./staging-validation.ts";
 
@@ -133,12 +137,7 @@ export async function inspectCloud(value: StagingIntake): Promise<string[]> {
     const quota = quotaRaw as Record<string, unknown>;
     if (field(tenancy, "id") !== value.tenancyId)
       issues.push("Tenancy identity mismatch");
-    if (
-      field(compartment, "id") !== value.compartmentId ||
-      field(compartment, "name") !== value.expectedCompartmentName ||
-      field(compartment, "lifecycle-state") !== "ACTIVE"
-    )
-      issues.push("Compartment identity/name/state mismatch");
+    issues.push(...validateCompartmentMetadata(compartment, value));
     if (
       !regions.some(
         (item) =>

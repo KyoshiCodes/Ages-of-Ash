@@ -1,4 +1,5 @@
 /** Render sanitized, mode-specific staging evidence; never include OCIDs, credentials or URLs. */
+import { TENANCY_ROOT_DENY } from "./staging-validation.ts";
 import type { RehearsalMode, StagingIntake } from "./staging-validation.ts";
 
 export type ReportInspection = "offline" | "blocked" | "attempted";
@@ -81,6 +82,10 @@ export function report({
       "- Reviewed exact commit: " + intake.releaseCommit,
     );
   }
+  if (intake?.productionDenyIds.includes(TENANCY_ROOT_DENY))
+    lines.push(
+      "- Deny boundary: TENANCY_ROOT resolves from tenancyId in memory; root targets are forbidden and OCIDs are omitted.",
+    );
   if (privateMode) {
     if (intake)
       lines.push(

@@ -4,7 +4,9 @@ Status: **proposed, unprovisioned**. This is a parameterized rehearsal design, n
 
 ## Boundary and inputs
 
-The operator fills `.local/staging/intake.json` from `deploy/staging-intake.template.json` and the two intake/ownership templates. Every angle-bracket token is unresolved by design. The named staging compartment must be separate from production, never the tenancy root. Region, availability domain, tenancy/compartment OCIDs, production-deny OCIDs, exact release SHA, DNS zone only for public-dns, shape/quota limit, VCN CIDRs, owners, and credential delivery are operator inputs and stay outside Git. No real identifier is asserted here.
+The operator fills `.local/staging/intake.json` from `deploy/staging-intake.template.json` and the two intake/ownership templates. Every angle-bracket token is unresolved by design. The named staging compartment must be separate from production, never the tenancy root. Region, availability domain, tenancy/compartment OCIDs, optional separate production-deny OCIDs, exact release SHA, DNS zone only for public-dns, shape/quota limit, VCN CIDRs, owners, and credential delivery are operator inputs and stay outside Git. No real identifier is asserted here.
+
+The mandatory TENANCY_ROOT deny-list entry resolves from the intake tenancyId in memory. The approved ages-staging compartment is a direct child of root; neither the root itself nor existing root workload resources are staging targets. Dedicated production-compartment OCIDs remain supported as additional private deny entries. Static checks reject root, listed compartments and production/root resource labels; live read-only metadata checks parentage. A green plan is not execution authority: compartment-scoped IAM and an execution-time target review must separately prevent provisioning, host preparation, release and recovery activity in root.
 
 ## First mode: private-no-dns, zero planned cost
 
