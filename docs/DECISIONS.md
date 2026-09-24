@@ -49,3 +49,5 @@
 - ADR-046: Make private-no-dns the explicit first staging intake mode with null DNS and zero public ingress; preserve public-dns as a separately approved future route, and treat $0 as an operator Console gate rather than a billing guarantee.
 
 - ADR-047: productionDenyIds requires literal TENANCY_ROOT, resolved only from the existing tenancy ID in memory; separate production-compartment OCIDs remain optional deny entries, and root targets are always forbidden.
+
+- ADR-048: The first private review proposes one Oracle Linux 9 ARM64 VM with edge/app/db as co-located role labels, one private subnet and Bastion SSH port-forwarding; no gateway, public resource or cloud action is authorized by the review package.

@@ -8,8 +8,8 @@
   "availabilityDomain": "<AVAILABILITY_DOMAIN>",
   "shape": "VM.Standard.A1.Flex",
   "architecture": "arm64",
-  "ocpus": 2,
-  "memoryGb": 12,
+  "ocpus": 1,
+  "memoryGb": 6,
   "bootVolumeGb": 50,
   "quotaLimitName": "<OCI_COMPUTE_LIMIT_NAME>",
   "quotaNeeded": 2,
@@ -25,9 +25,9 @@
     "database": "ages-stg-db"
   },
   "network": {
-    "vcnCidr": "<VCN_CIDR>",
+    "vcnCidr": "10.86.0.0/16",
     "publicSubnetCidr": "<PUBLIC_SUBNET_CIDR>",
-    "privateSubnetCidr": "<PRIVATE_SUBNET_CIDR>",
+    "privateSubnetCidr": "10.86.2.0/24",
     "publicIngressTcp": [],
     "apiPublicIp": false,
     "workerPublicIp": false,

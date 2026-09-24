@@ -54,6 +54,32 @@ function privateFixture() {
   };
 }
 describe("OCI staging preparation", () => {
+  it("keeps the private intake template aligned with the one-VM review boundary", () => {
+    expect(template.rehearsalMode).toBe("private-no-dns");
+    expect(template.expectedCompartmentName).toBe("ages-staging");
+    expect(template.productionDenyIds).toContain(TENANCY_ROOT_DENY);
+    expect([
+      template.shape,
+      template.architecture,
+      template.ocpus,
+      template.memoryGb,
+      template.bootVolumeGb,
+    ]).toEqual(["VM.Standard.A1.Flex", "arm64", 1, 6, 50]);
+    expect([
+      template.resourceNames.vcn,
+      template.resourceNames.privateSubnet,
+    ]).toEqual(["ages-stg-vcn", "ages-stg-private"]);
+    expect([
+      template.network.vcnCidr,
+      template.network.privateSubnetCidr,
+    ]).toEqual(["10.86.0.0/16", "10.86.2.0/24"]);
+    expect(template.network.publicIngressTcp).toEqual([]);
+    expect(
+      Object.values(template.network).filter((value) => value === true),
+    ).toEqual([]);
+    expect(template.network.postgresListen).toBe("127.0.0.1");
+    expect(template.network.adminAccess).toBe("oci-bastion");
+  });
   it("rejects every unresolved template placeholder", () => {
     expect(placeholderPaths(template).length).toBeGreaterThan(5);
     expect(
