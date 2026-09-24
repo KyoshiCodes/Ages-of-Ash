@@ -2,6 +2,10 @@
 
 Workspace: `C:\Projects\Ages of Ash`; canonical remote: https://github.com/KyoshiCodes/Ages-of-Ash. Prisma CLI, client and adapter remain pinned to **7.10.0**. The playable Ember Ledger expansion remains: timed operations, offline catch-up/report, crew histories, supply graph, faction pressure, Ash Cycle, optional lazy 3D/audio and server-side telemetry.
 
+## Regional A1 quota preflight argument — 2026-09-23
+
+The read-only regional A1 core quota command now omits availability-domain for standard-a1-core-regional-count. Selected-AD compute shape discovery still includes availability-domain, and the quota get call still uses the approved child staging compartment, compute service, limit name and region. The intake and runbook identify this quota as regional; quotaNeeded remains the available-quota threshold and ocpus remains the per-VM allocation. Native Windows pnpm verify:full passed on disposable PostgreSQL 18.6 with Prisma 7.10.0: 45 unit (16 staging), 6 integration, 5 E2E, backup/restore/refusal, typecheck, lint, build and 165.3 KiB gzip initial JS. No OCI command or live plan was run, so the real CLI outcome remains unverified.
+
 ## Local staging-report label clarification — 2026-09-23
 
 The private-no-dns report now displays the planned 1 OCPU / 6 GiB A1 VM and 50 GiB boot disk separately from the required available A1 core quota threshold of 2. It labels releaseCommit as a reviewed/pinned release baseline, which may differ from the checkout generating the report. No quota comparison, TENANCY_ROOT guard, private exposure rule, OCI call path, or deployment behavior changed. A temporary ignored-intake copy rendered offline with no OCIDs; it and its report were removed. Native Windows pnpm verify:full passed 44 unit (15 staging), 6 integration and 5 E2E tests, backup/restore/refusal, typecheck, lint, build and 165.3 KiB gzip initial JS. No live OCI preflight or cloud action ran for this clarity fix.

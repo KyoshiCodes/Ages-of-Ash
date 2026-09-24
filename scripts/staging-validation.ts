@@ -285,6 +285,11 @@ export function validateCompartmentMetadata(
 /** Fixed allowlist of read-only OCI CLI operations. Values remain literal arguments. */
 export function readOnlyCommands(value: StagingIntake): string[][] {
   const region = ["--region", value.region, "--output", "json"];
+  // The A1 core regional limit rejects an availability-domain argument.
+  const quotaScope =
+    value.quotaLimitName === "standard-a1-core-regional-count"
+      ? []
+      : ["--availability-domain", value.availabilityDomain];
   return [
     ["iam", "tenancy", "get", "--tenancy-id", value.tenancyId, ...region],
     [
@@ -324,8 +329,7 @@ export function readOnlyCommands(value: StagingIntake): string[][] {
       "compute",
       "--limit-name",
       value.quotaLimitName,
-      "--availability-domain",
-      value.availabilityDomain,
+      ...quotaScope,
       ...region,
     ],
     ...(value.rehearsalMode === "public-dns" && value.zoneName

@@ -419,6 +419,52 @@ describe("OCI staging preparation", () => {
       }).issues,
     ).toContain("network: subnets must be distinct and within the VCN");
   });
+  it("scopes selected-AD shape discovery and regional A1 quota availability separately", () => {
+    for (const raw of [privateFixture(), fixture()]) {
+      const parsed = validateIntake(raw);
+      expect(parsed.issues).toEqual([]);
+      const intake = parsed.intake!;
+      const commands = readOnlyCommands(intake);
+      expect(commands.find((command) => command[0] === "compute")).toEqual([
+        "compute",
+        "shape",
+        "list",
+        "--compartment-id",
+        intake.compartmentId,
+        "--availability-domain",
+        intake.availabilityDomain,
+        "--all",
+        "--region",
+        intake.region,
+        "--output",
+        "json",
+      ]);
+      const quota = commands.find((command) => command[0] === "limits");
+      expect(quota).toEqual([
+        "limits",
+        "resource-availability",
+        "get",
+        "--compartment-id",
+        intake.compartmentId,
+        "--service-name",
+        "compute",
+        "--limit-name",
+        "standard-a1-core-regional-count",
+        "--region",
+        intake.region,
+        "--output",
+        "json",
+      ]);
+      expect(quota).not.toContain("--availability-domain");
+      expect(intake.productionDenyIds).toContain(TENANCY_ROOT_DENY);
+      expect(
+        validateIntake({ ...raw, compartmentId: raw.tenancyId }).issues,
+      ).toContain("compartmentId: root tenancy is not staging isolation");
+      const evidence = report({ intake, issues: [], inspection: "offline" });
+      expect(evidence).not.toContain(intake.tenancyId);
+      expect(evidence).not.toContain(intake.compartmentId);
+    }
+  });
   it("only plans fixed read-only OCI commands with literal arguments", () => {
     const result = validateIntake(fixture());
     expect(result.intake).toBeDefined();
